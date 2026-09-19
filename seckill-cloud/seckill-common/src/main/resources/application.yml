@@ -1,3 +1,0 @@
-jwt:
-  secret: ${JWT_SECRET} # Base64??
-  expiration: 604800000 # 7?
