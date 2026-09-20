@@ -1,7 +1,9 @@
 package com.example.exception;
 
+import com.example.result.ErrorCode;
+
 public class UserException extends BaseBusinessException {
-    public UserException(String msg) {
-        super(1000,msg);
+    public UserException(ErrorCode errorCode) {
+        super(errorCode);
     }
 }

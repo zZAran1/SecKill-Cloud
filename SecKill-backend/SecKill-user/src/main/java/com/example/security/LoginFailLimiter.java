@@ -1,6 +1,7 @@
 package com.example.security;
 
 import com.example.exception.UserException;
+import com.example.result.ErrorCode;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 
@@ -10,7 +11,7 @@ import java.time.Duration;
 
 @Component
 public class LoginFailLimiter {
-    private static final String KET_PREFIX="seckill:login:fail:";
+    private static final String KEY_PREFIX="seckill:login:fail:";
     private static final int MAX_FAILS=5;
     private static final Duration WINDOW =Duration.ofMinutes(10);
 
@@ -21,14 +22,14 @@ public class LoginFailLimiter {
     }
 
     public void checkNotLocked(String phone){
-        String fails=redisTemplate.opsForValue().get(KET_PREFIX+phone);
+        String fails=redisTemplate.opsForValue().get(KEY_PREFIX+phone);
         if(fails!=null && Integer.parseInt(fails)>=MAX_FAILS){
-            throw new UserException("失败次数过多，账号已锁定，请10分钟后再试");
+            throw new UserException(ErrorCode.LOGIN_LOCKED);
         }
     }
 
     public void onFail(String phone){
-        String key= KET_PREFIX + phone;
+        String key= KEY_PREFIX + phone;
         Long count =redisTemplate.opsForValue().increment(key);
         if(count!=null && count ==1L){
             redisTemplate.expire(key,WINDOW);
@@ -36,6 +37,6 @@ public class LoginFailLimiter {
     }
 
     public void onSuccess(String phone){
-        redisTemplate.delete(KET_PREFIX+phone);
+        redisTemplate.delete(KEY_PREFIX+phone);
     }
 }

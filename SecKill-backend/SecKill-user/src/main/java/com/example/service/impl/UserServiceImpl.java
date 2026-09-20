@@ -11,6 +11,8 @@ import com.example.model.dto.RegisterDTO;
 import com.example.model.entity.Users;
 import com.example.model.vo.TokenVO;
 import com.example.model.vo.UserInfoVO;
+import com.example.result.ErrorCode;
+import com.example.security.LoginFailLimiter;
 import com.example.security.TokenBlacklist;
 import com.example.service.UserService;
 import com.example.util.JwtUtil;
@@ -24,11 +26,16 @@ public class UserServiceImpl extends ServiceImpl<UserMapper,Users> implements Us
     private final PasswordEncoder passwordEncoder;
     private final JwtUtil jwtUtil;
     private final TokenBlacklist tokenBlacklist;
+    private final LoginFailLimiter limiter;
 
-    public UserServiceImpl(PasswordEncoder passwordEncoder, JwtUtil jwtUtil, TokenBlacklist tokenBlacklist) {
+    public UserServiceImpl(PasswordEncoder passwordEncoder,
+                           JwtUtil jwtUtil,
+                           TokenBlacklist tokenBlacklist,
+                           LoginFailLimiter limiter) {
         this.passwordEncoder = passwordEncoder;
         this.jwtUtil = jwtUtil;
         this.tokenBlacklist = tokenBlacklist;
+        this.limiter = limiter;
     }
 
     @Override
@@ -40,23 +47,26 @@ public class UserServiceImpl extends ServiceImpl<UserMapper,Users> implements Us
         try{
             this.save(users);
         }catch (DuplicateKeyException e){
-            throw new UserException("用户名、邮箱或手机号已被注册");
+            throw new UserException(ErrorCode.USER_ALREADY_EXISTS);
         }
     }
 
     @Override
     public TokenVO login(LoginDTO dto){
-        Users db_user=this.lambdaQuery()
+        limiter.checkNotLocked(dto.getPhone());
+        Users dbUser=this.lambdaQuery()
                 .eq(Users::getPhone,dto.getPhone())
                 .one();
-        if(db_user==null || !passwordEncoder.matches(dto.getPassword(),db_user.getPassword())){
-            throw new UserException("手机号或密码错误");
+        if(dbUser==null || !passwordEncoder.matches(dto.getPassword(),dbUser.getPassword())){
+            limiter.onFail(dto.getPhone());
+            throw new UserException(ErrorCode.LOGIN_FAILED);
         }
-        if(db_user.getStatus()!= UserConstants.STATUS_ENABLED){
-            throw new UserException("该账号已被封禁");
+        if(dbUser.getStatus()!= UserConstants.STATUS_ENABLED){
+            throw new UserException(ErrorCode.ACCOUNT_DISABLED);
         }
         TokenVO tokenVO=new TokenVO();
-        tokenVO.setToken(jwtUtil.generateToken(db_user.getId(),db_user.getUsername(),String.valueOf(db_user.getRole()),String.valueOf(db_user.getStatus())));
+        tokenVO.setToken(jwtUtil.generateToken(dbUser.getId(),dbUser.getUsername(),String.valueOf(dbUser.getRole()),String.valueOf(dbUser.getStatus())));
+        limiter.onSuccess(dto.getPhone());
         return tokenVO;
     }
 
@@ -64,7 +74,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper,Users> implements Us
     public UserInfoVO getUserInfo(Long userId){
         Users user=getById(userId);
         if(user==null){
-            throw new UserException("用户不存在");
+            throw new UserException(ErrorCode.USER_NOT_FOUND);
         }
         return UserConverter.INSTANCE.toVO(user);
     }

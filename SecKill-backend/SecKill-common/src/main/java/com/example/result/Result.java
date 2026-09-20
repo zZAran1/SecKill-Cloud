@@ -42,4 +42,16 @@ public class Result<T> {
         result.setData(null);
         return result;
     }
+    public static <T> Result<T> error(ErrorCode errorCode) {
+        Result<T> result = new Result<T>();
+        result.setCode(errorCode.getCode());
+        result.setMsg(errorCode.getMessage());
+        return result;
+    }
+    public static <T> Result<T> error(ErrorCode errorCode, String msg) {
+        Result<T> result = new Result<T>();
+        result.setCode(errorCode.getCode());
+        result.setMsg(msg);
+        return result;
+    }
 }

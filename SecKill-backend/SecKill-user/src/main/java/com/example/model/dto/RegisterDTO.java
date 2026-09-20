@@ -15,7 +15,7 @@ public class RegisterDTO {
     private String username;
 
     @NotBlank(message = "密码不能为空")
-    @Size(min=6,max=20,message="密码长度必须在6-20个字符之间")
+    @Pattern(regexp = "^(?=.*[A-Za-z])(?=.*\\d)\\S{8,20}$" ,message = "密码必须为8~20位，且同时包含字母和数字")
     private String password;
 
     @NotBlank(message = "手机号不能为空")
