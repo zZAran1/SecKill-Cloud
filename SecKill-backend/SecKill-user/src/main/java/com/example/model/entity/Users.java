@@ -19,6 +19,8 @@ public class Users {
     private Integer role;
     private Integer status;
     private String sex;
+    private Integer age;
+    private String address;
     private LocalDateTime createTime;
     private LocalDateTime updateTime;
 }
