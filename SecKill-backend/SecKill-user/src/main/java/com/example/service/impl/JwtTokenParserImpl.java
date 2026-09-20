@@ -20,6 +20,7 @@ public class JwtTokenParserImpl implements JwtTokenParser {
         loginUser.setUsername(claims.get("username",String.class));
         loginUser.setRole(claims.get("role",String.class));
         loginUser.setStatus(claims.get("status",String.class));
+        loginUser.setJti(claims.getId());
         loginUser.setId(Long.valueOf(claims.getSubject()));
         return loginUser;
     }

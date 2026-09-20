@@ -20,6 +20,7 @@ public class JwtUtil {
     }
 
     public String generateToken (Long userId, String username, String role, String status) { return Jwts.builder()
+            .id(java.util.UUID.randomUUID().toString())
             .subject(String.valueOf(userId))
             .claim( "username" , username)
             .claim( "role" , role)

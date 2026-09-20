@@ -11,8 +11,11 @@ import com.example.model.dto.RegisterDTO;
 import com.example.model.entity.Users;
 import com.example.model.vo.TokenVO;
 import com.example.model.vo.UserInfoVO;
+import com.example.security.TokenBlacklist;
 import com.example.service.UserService;
 import com.example.util.JwtUtil;
+import io.jsonwebtoken.Claims;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -20,25 +23,25 @@ import org.springframework.stereotype.Service;
 public class UserServiceImpl extends ServiceImpl<UserMapper,Users> implements UserService {
     private final PasswordEncoder passwordEncoder;
     private final JwtUtil jwtUtil;
+    private final TokenBlacklist tokenBlacklist;
 
-    public UserServiceImpl(PasswordEncoder passwordEncoder, JwtUtil jwtUtil) {
+    public UserServiceImpl(PasswordEncoder passwordEncoder, JwtUtil jwtUtil, TokenBlacklist tokenBlacklist) {
         this.passwordEncoder = passwordEncoder;
         this.jwtUtil = jwtUtil;
+        this.tokenBlacklist = tokenBlacklist;
     }
 
     @Override
     public void register(RegisterDTO dto){
-        if(count(new LambdaQueryWrapper<Users>().eq(Users::getUsername, dto.getUsername()))>0){
-            throw new UserException("该用户名已被使用");
-        }
-        if(count(new LambdaQueryWrapper<Users>().eq(Users::getPhone,dto.getPhone()))>0){
-            throw new UserException("该手机号已被注册");
-        }
         Users users= UserConverter.INSTANCE.toEntity(dto);
         users.setPassword(passwordEncoder.encode(dto.getPassword()));
         users.setStatus(UserConstants.STATUS_ENABLED);
         users.setRole(UserConstants.ROLE_USER);
-        this.save(users);
+        try{
+            this.save(users);
+        }catch (DuplicateKeyException e){
+            throw new UserException("用户名、邮箱或手机号已被注册");
+        }
     }
 
     @Override
@@ -66,4 +69,12 @@ public class UserServiceImpl extends ServiceImpl<UserMapper,Users> implements Us
         return UserConverter.INSTANCE.toVO(user);
     }
 
+    @Override
+    public void logout(String token){
+        Claims claims=jwtUtil.parseToken(token);
+        long remaining =claims.getExpiration().getTime() - System.currentTimeMillis();
+        if(remaining>0){
+            tokenBlacklist.blacklist(claims.getId(),remaining);
+        }
+    }
 }

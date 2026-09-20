@@ -3,6 +3,7 @@ package com.example.config;
 import com.example.result.Result;
 import com.example.security.JwtAuthenticationFilter;
 import com.example.security.JwtTokenParser;
+import com.example.security.TokenBlacklist;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.context.annotation.Bean;
@@ -30,7 +31,7 @@ public class SecurityConfig {
     }
 
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain securityFilterChain(HttpSecurity http, TokenBlacklist tokenBlacklist) throws Exception {
         http
                 .csrf(AbstractHttpConfigurer::disable)
                 .formLogin(AbstractHttpConfigurer::disable)
@@ -46,7 +47,7 @@ public class SecurityConfig {
                             response.setContentType("application/json;charset=utf-8");
                             objectMapper.writeValue(response.getWriter(), Result.error(401, "未登录或登录已过期"));
                         }))
-                .addFilterBefore(new JwtAuthenticationFilter(jwtTokenParser), UsernamePasswordAuthenticationFilter.class);
+                .addFilterBefore(new JwtAuthenticationFilter(jwtTokenParser,tokenBlacklist), UsernamePasswordAuthenticationFilter.class);
         return http.build();
     }
 

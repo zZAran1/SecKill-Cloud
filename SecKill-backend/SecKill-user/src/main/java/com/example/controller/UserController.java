@@ -35,5 +35,9 @@ public class UserController {
         return Result.success(userService.getUserInfo(UserContext.getUserId()));
     }
 
-
+    @PostMapping("/logout")
+    public Result<Void> logout(@RequestHeader("Authorization") String authorization) {
+        userService.logout(authorization.substring(7));
+        return Result.success("退出登录成功");
+    }
 }

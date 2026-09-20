@@ -16,9 +16,11 @@ import java.util.List;
 
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private final JwtTokenParser jwtTokenParser;
+    private final TokenBlacklist tokenBlacklist;
     private static final Logger log = LoggerFactory.getLogger(JwtAuthenticationFilter.class);
-    public JwtAuthenticationFilter(JwtTokenParser jwtTokenParser) {
+    public JwtAuthenticationFilter(JwtTokenParser jwtTokenParser,TokenBlacklist tokenBlacklist) {
         this.jwtTokenParser = jwtTokenParser;
+        this.tokenBlacklist = tokenBlacklist;
     }
 
     @Override
@@ -31,8 +33,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
             try{
                 LoginUser user=jwtTokenParser.parse(token);
-                UsernamePasswordAuthenticationToken authentication =new UsernamePasswordAuthenticationToken(user,null,List.of(new SimpleGrantedAuthority("ROLE_" + user.getRole())));
-                SecurityContextHolder.getContext().setAuthentication(authentication);
+                if(tokenBlacklist.isBlacklisted(user.getJti())){
+                    SecurityContextHolder.clearContext();
+                }else{
+                    UsernamePasswordAuthenticationToken authentication =new UsernamePasswordAuthenticationToken(user,null,List.of(new SimpleGrantedAuthority("ROLE_" + user.getRole())));
+                    SecurityContextHolder.getContext().setAuthentication(authentication);
+                }
             }catch (Exception e){
                 log.debug("Token 解析失败：{}",e.getMessage());
                 SecurityContextHolder.clearContext();
