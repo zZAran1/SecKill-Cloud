@@ -18,6 +18,7 @@
           <entry name="$MAVEN_REPOSITORY$/org/mapstruct/mapstruct/1.5.5.Final/mapstruct-1.5.5.Final.jar" />
         </processorPath>
         <module name="SecKill-common" />
+        <module name="SecKill-product" />
         <module name="SecKill-user" />
       </profile>
     </annotationProcessing>
@@ -29,6 +30,7 @@
     <option name="ADDITIONAL_OPTIONS_OVERRIDE">
       <module name="SecKill-backend" options="-parameters" />
       <module name="SecKill-common" options="-parameters" />
+      <module name="SecKill-product" options="-parameters" />
       <module name="SecKill-user" options="-parameters" />
       <module name="SecKill-users" options="-parameters" />
     </option>

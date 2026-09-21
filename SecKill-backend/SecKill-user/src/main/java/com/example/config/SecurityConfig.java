@@ -1,5 +1,6 @@
 package com.example.config;
 
+import com.example.result.ErrorCode;
 import com.example.result.Result;
 import com.example.security.JwtAuthenticationFilter;
 import com.example.security.JwtTokenParser;
@@ -40,12 +41,13 @@ public class SecurityConfig {
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.POST,"/users", "/users/login").permitAll()
+                        .requestMatchers("/v3/api-docs/**","/swagger-ui/**","swagger-ui.html","/actuator/health").permitAll()
                         .anyRequest().authenticated())
                 .exceptionHandling(ex -> ex
                         .authenticationEntryPoint((request, response, authException) -> {
                             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
                             response.setContentType("application/json;charset=utf-8");
-                            objectMapper.writeValue(response.getWriter(), Result.error(401, "未登录或登录已过期"));
+                            objectMapper.writeValue(response.getWriter(), Result.error(ErrorCode.UNAUTHORIZED));
                         }))
                 .addFilterBefore(new JwtAuthenticationFilter(jwtTokenParser,tokenBlacklist), UsernamePasswordAuthenticationFilter.class);
         return http.build();

@@ -20,6 +20,7 @@ import io.jsonwebtoken.Claims;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class UserServiceImpl extends ServiceImpl<UserMapper,Users> implements UserService {
@@ -39,6 +40,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper,Users> implements Us
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public void register(RegisterDTO dto){
         Users users= UserConverter.INSTANCE.toEntity(dto);
         users.setPassword(passwordEncoder.encode(dto.getPassword()));
