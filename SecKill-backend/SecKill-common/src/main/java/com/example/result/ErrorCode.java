@@ -14,7 +14,9 @@ public enum ErrorCode {
     USER_ALREADY_EXISTS( 1002 , "用户名、邮箱或手机号已被注册" ),
     LOGIN_FAILED( 1003 , "手机号或密码错误" ),
     ACCOUNT_DISABLED( 1004 , "该账号已被封禁" ),
+    NOT_FOUND(404,"请求接口不存在"),
     LOGIN_LOCKED(1005,"失败次数过多，账号已锁定，请10分钟后再试");
+
 
 
     private final int code;

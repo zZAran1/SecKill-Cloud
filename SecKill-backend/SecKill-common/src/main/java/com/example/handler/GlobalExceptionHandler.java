@@ -11,6 +11,7 @@ import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -36,11 +37,16 @@ public class GlobalExceptionHandler {
         log.warn("请求体解析失败：{}",e.getMessage());
         return Result.error(ErrorCode.BAD_REQUEST,"请求体格式错误，请检查JSON格式");
     }
-
     @ExceptionHandler(DuplicateKeyException.class)
     public Result<Void> handleDuplicateKeyException(DuplicateKeyException e){
         log.warn("唯一约束冲突：{}",e.getMessage());
         return Result.error(ErrorCode.CONFLICT,"数据已存在，请勿重复提交");
+    }
+
+    @ExceptionHandler(NoResourceFoundException.class)
+    public Result<Void> handleNotFound(NoResourceFoundException e){
+        log.warn("接口不存在：{}",e.getResourcePath());
+        return  Result.error(ErrorCode.NOT_FOUND);
     }
     @ExceptionHandler(Exception.class)
     public Result<Void> handleException(Exception e){
