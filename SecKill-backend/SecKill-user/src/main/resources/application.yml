@@ -10,6 +10,11 @@ spring:
     enabled: true
     locations: classpath:db/migration
     baseline-on-migrate: true
+  cloud:
+    nacos:
+      discovery:
+        server-addr: ${NACOS_ADDR:127.0.0.1:8848}
+        ip: 127.0.0.1
 mybatis-plus:
   configuration:
     map-underscore-to-camel-case: true

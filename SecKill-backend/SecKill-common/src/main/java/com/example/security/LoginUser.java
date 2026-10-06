@@ -8,5 +8,4 @@ public class LoginUser {
     private String username;
     private String role;
     private String status;
-    private String jti;
 }

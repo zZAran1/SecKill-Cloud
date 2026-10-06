@@ -8,7 +8,6 @@ import com.example.model.entity.Users;
 import com.example.model.vo.TokenVO;
 import com.example.result.ErrorCode;
 import com.example.security.LoginFailLimiter;
-import com.example.security.TokenBlacklist;
 import com.example.util.JwtUtil;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -32,8 +31,6 @@ class UserServiceImplTest {
     @Mock
     JwtUtil jwtUtil;
     @Mock
-    TokenBlacklist tokenBlacklist;
-    @Mock
     LoginFailLimiter loginFailLimiter;
     @Mock
     UserMapper userMapper;
@@ -42,7 +39,7 @@ class UserServiceImplTest {
 
     @BeforeEach
     void setUp() {
-        userService = new UserServiceImpl(passwordEncoder, jwtUtil, tokenBlacklist, loginFailLimiter);
+        userService = new UserServiceImpl(passwordEncoder, jwtUtil, loginFailLimiter);
         ReflectionTestUtils.setField(userService, "baseMapper", userMapper);
     }
 

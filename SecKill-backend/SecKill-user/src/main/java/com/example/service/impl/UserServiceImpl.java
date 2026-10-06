@@ -1,6 +1,5 @@
 package com.example.service.impl;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.example.constant.UserConstants;
 import com.example.converter.UserConverter;
@@ -13,10 +12,8 @@ import com.example.model.vo.TokenVO;
 import com.example.model.vo.UserInfoVO;
 import com.example.result.ErrorCode;
 import com.example.security.LoginFailLimiter;
-import com.example.security.TokenBlacklist;
 import com.example.service.UserService;
 import com.example.util.JwtUtil;
-import io.jsonwebtoken.Claims;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -26,16 +23,14 @@ import org.springframework.transaction.annotation.Transactional;
 public class UserServiceImpl extends ServiceImpl<UserMapper,Users> implements UserService {
     private final PasswordEncoder passwordEncoder;
     private final JwtUtil jwtUtil;
-    private final TokenBlacklist tokenBlacklist;
+
     private final LoginFailLimiter limiter;
 
     public UserServiceImpl(PasswordEncoder passwordEncoder,
                            JwtUtil jwtUtil,
-                           TokenBlacklist tokenBlacklist,
                            LoginFailLimiter limiter) {
         this.passwordEncoder = passwordEncoder;
         this.jwtUtil = jwtUtil;
-        this.tokenBlacklist = tokenBlacklist;
         this.limiter = limiter;
     }
 
@@ -82,11 +77,9 @@ public class UserServiceImpl extends ServiceImpl<UserMapper,Users> implements Us
     }
 
     @Override
-    public void logout(String token){
-        Claims claims=jwtUtil.parseToken(token);
-        long remaining =claims.getExpiration().getTime() - System.currentTimeMillis();
-        if(remaining>0){
-            tokenBlacklist.blacklist(claims.getId(),remaining);
-        }
+    public void logout(){
+
     }
+
+
 }

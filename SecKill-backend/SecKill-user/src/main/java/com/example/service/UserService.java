@@ -11,5 +11,5 @@ public interface UserService extends IService<Users> {
     void register(RegisterDTO dto);
     TokenVO login(LoginDTO dto);
     UserInfoVO getUserInfo(Long userId);
-    void logout(String token);
+    void logout();
 }

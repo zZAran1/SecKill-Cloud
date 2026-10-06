@@ -1,0 +1,16 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="网关模块" type="SpringBootApplicationConfigurationType" factoryName="Spring Boot">
+    <envs>
+      <env name="JWT_EXPIRATION" value="7200000" />
+      <env name="JWT_SECRET" value="V8DBDtDFGcXh4m20lLse3GEZbZuFhwM1Yj/3wO1/9o0=" />
+      <env name="REDIS_HOST" value="localhost" />
+      <env name="REDIS_PASSWORD" value="zZ_Rd5xK9mQ2pL7wZ4t" />
+      <env name="REDIS_PORT" value="6379" />
+    </envs>
+    <module name="SecKill-gateway" />
+    <option name="SPRING_BOOT_MAIN_CLASS" value="com.example.SecKillGatewayApplication" />
+    <method v="2">
+      <option name="Make" enabled="true" />
+    </method>
+  </configuration>
+</component>

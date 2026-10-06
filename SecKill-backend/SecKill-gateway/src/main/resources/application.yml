@@ -1,0 +1,41 @@
+server:
+  port: 8080  # 网关统一入口
+
+spring:
+  application:
+    name: seckill-gateway
+  cloud:
+    nacos:
+      discovery:
+        server-addr: ${NACOS_ADDR:127.0.0.1:8848}
+        ip: 127.0.0.1
+    gateway:
+      routes:
+        # 用户服务路由
+        - id: user-service
+          uri: lb://seckill-user    # lb = LoadBalancer,从 Nacos 拿实例列表
+          predicates:
+            - Path=/users/**
+        # 商品服务路由
+        - id: product-service
+          uri: lb://seckill-product
+          predicates:
+            - Path=/products/**
+        # 订单服务路由
+        - id: order-service
+          uri: lb://seckill-order
+          predicates:
+            - Path=/orders/**
+      default-filters:
+        # 所有响应统一加响应头,标识经过网关
+        - AddResponseHeader=X-Gateway, seckill-gateway
+  data:
+    redis:
+      host: ${REDIS_HOST}
+      port: ${REDIS_PORT}
+      password: ${REDIS_PASSWORD}
+
+# JWT 配置:验签用(签发还是在 user 服务)
+jwt:
+  secret: ${JWT_SECRET}
+  expiration: ${JWT_EXPIRATION}

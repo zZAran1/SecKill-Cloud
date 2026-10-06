@@ -65,6 +65,8 @@
         <module>SecKill-common</module>
         <module>SecKill-user</module>
         <module>SecKill-product</module>
+        <module>SecKill-gateway</module>
+        <module>SecKill-order</module>
     </modules>
     <build>
         <plugins>
