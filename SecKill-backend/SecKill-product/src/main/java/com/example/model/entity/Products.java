@@ -16,6 +16,7 @@ public class Products {
     private String description;
     private BigDecimal price;
     private Integer status;
+    private Integer stock;
     private String imageUrl;
     private Integer version;
     private LocalDateTime createTime;

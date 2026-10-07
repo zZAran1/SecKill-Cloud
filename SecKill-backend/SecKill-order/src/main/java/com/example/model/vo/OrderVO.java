@@ -3,6 +3,7 @@ package com.example.model.vo;
 import lombok.Data;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 
 @Data
 public class OrderVO {
@@ -11,4 +12,5 @@ public class OrderVO {
     private Integer quantity;
     private BigDecimal totalAmount;
     private Integer status;
+    private LocalDateTime createTime;
 }

@@ -6,6 +6,7 @@
       <env name="REDIS_HOST" value="localhost" />
       <env name="REDIS_PASSWORD" value="zZ_Rd5xK9mQ2pL7wZ4t" />
       <env name="REDIS_PORT" value="6379" />
+      <env name="GATEWAY_INTERNAL_SECRET" value="changeme" />
     </envs>
     <module name="SecKill-gateway" />
     <option name="SPRING_BOOT_MAIN_CLASS" value="com.example.SecKillGatewayApplication" />

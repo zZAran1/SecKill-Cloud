@@ -26,6 +26,30 @@ spring:
           uri: lb://seckill-order
           predicates:
             - Path=/orders/**
+          filters:
+            - name: RequestRateLimiter
+              args:
+                key-resolver: '#{@userKeyResolver}'
+                redis-rate-limiter.replenishRate: 10
+                redis-rate-limiter.burstCapacity: 20
+                redis-rate-limiter.requestedTokens: 1
+        # 秒杀服务路由（加限流）
+        - id: seckill-service
+          uri: lb://seckill-order
+          predicates:
+            - Path=/seckill/**
+          filters:
+            - name: RequestRateLimiter
+              args:
+                key-resolver: '#{@userKeyResolver}'
+                redis-rate-limiter.replenishRate: 5
+                redis-rate-limiter.burstCapacity: 10
+                redis-rate-limiter.requestedTokens: 1
+        # 秒杀活动管理路由（预热等,属商品服务）
+        - id: seckill-activity-service
+          uri: lb://seckill-product
+          predicates:
+            - Path=/seckill-activities/**
       default-filters:
         # 所有响应统一加响应头,标识经过网关
         - AddResponseHeader=X-Gateway, seckill-gateway
@@ -39,3 +63,5 @@ spring:
 jwt:
   secret: ${JWT_SECRET}
   expiration: ${JWT_EXPIRATION}
+gateway:
+  internal-secret: ${GATEWAY_INTERNAL_SECRET}

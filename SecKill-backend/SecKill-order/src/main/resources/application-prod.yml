@@ -9,9 +9,25 @@ spring:
       host: ${REDIS_HOST}
       port: ${REDIS_PORT}
       password: ${REDIS_PASSWORD}
+  rabbitmq:
+    host: ${RABBITMQ_HOST}
+    port: ${RABBITMQ_PORT}
+    username: ${RABBITMQ_USERNAME}
+    password: ${RABBITMQ_PASSWORD}
+    listener:
+      simple:
+        acknowledge-mode: manual
+        retry:
+          enabled: true
+          max-attempts: 3
+    publisher-confirm-type: correlated
+    publisher-returns: true
 
 springdoc:
   swagger-ui:
     enabled: false
   api-docs:
     enabled: false
+
+gateway:
+  internal-secret: ${GATEWAY_INTERNAL_SECRET}

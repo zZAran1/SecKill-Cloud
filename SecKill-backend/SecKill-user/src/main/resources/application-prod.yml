@@ -17,3 +17,5 @@ springdoc:
 jwt:
   secret: ${JWT_SECRET}
   expiration: ${JWT_EXPIRATION}
+gateway:
+  internal-secret: ${GATEWAY_INTERNAL_SECRET}

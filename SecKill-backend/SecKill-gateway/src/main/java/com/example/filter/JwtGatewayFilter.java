@@ -19,27 +19,40 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 
+import javax.crypto.Mac;
 import javax.crypto.SecretKey;
+import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 @Component
 public class JwtGatewayFilter implements GlobalFilter, Ordered {
 
-    // 无需登录的白名单路径
-    private static final List<String> WHITE_LIST = List.of(
-            "/users/login", "/users/register",
-            "/v3/api-docs", "/swagger-ui", "/actuator/health");
+    // 精确匹配：路径 + 允许的方法（登录、注册）
+    private static final Map<String, Set<HttpMethod>> EXACT_WHITE_LIST = Map.of(
+            "/users", Set.of(HttpMethod.POST),
+            "/users/login", Set.of(HttpMethod.POST));
+
+    // 前缀匹配：仅 GET 放行（文档、健康检查、商品浏览）
+    private static final List<String> GET_PREFIX_WHITE_LIST = List.of(
+            "/v3/api-docs", "/swagger-ui", "/actuator/health", "/products");
 
     private final SecretKey secretKey;
     private final StringRedisTemplate redisTemplate;
+    private final String internalSecret;
+    private static final String SIGNATURE_HEADER = "X-Gateway-Signature";
+    private static final String SIGNATURE_ALGORITHM = "HmacSHA256";
 
     public JwtGatewayFilter(@Value("${jwt.secret}") String base64Secret,
+                            @Value("${gateway.internal-secret}") String internalSecret,
                             StringRedisTemplate redisTemplate) {
         this.secretKey = Keys.hmacShaKeyFor(Base64.getDecoder().decode(base64Secret));
         this.redisTemplate = redisTemplate;
+        this.internalSecret =internalSecret;
     }
 
     @Override
@@ -100,16 +113,19 @@ public class JwtGatewayFilter implements GlobalFilter, Ordered {
                     h.set("X-Username", String.valueOf(claims.get("username")));
                     h.set("X-Role", String.valueOf(claims.get("role")));
                     h.set("X-Status", String.valueOf(claims.get("status")));
+                    h.set(SIGNATURE_HEADER, generateSignature(claims.getSubject(), String.valueOf(claims.get("role"))));
                 })
                 .build();
         return chain.filter(exchange.mutate().request(mutated).build());
     }
 
     private boolean isWhite(String path, HttpMethod method) {
-        if (WHITE_LIST.stream().anyMatch(path::startsWith)) {
+        Set<HttpMethod> methods = EXACT_WHITE_LIST.get(path);  // 精确匹配
+        if (methods != null && methods.contains(method)) {
             return true;
         }
-        return HttpMethod.GET.equals(method) && path.startsWith("/products");
+        return HttpMethod.GET.equals(method)
+                && GET_PREFIX_WHITE_LIST.stream().anyMatch(path::startsWith);
     }
 
     private Mono<Void> unauthorized(ServerWebExchange exchange) {
@@ -119,6 +135,18 @@ public class JwtGatewayFilter implements GlobalFilter, Ordered {
         byte[] body = "{\"code\":401,\"message\":\"未登录或登录已过期\"}"
                 .getBytes(StandardCharsets.UTF_8);
         return response.writeWith(Mono.just(response.bufferFactory().wrap(body)));
+    }
+
+    private String generateSignature(String userId, String role) {
+        try {
+            String data = "X-User-Id=" + userId + "&X-Role=" + role;
+            Mac mac = Mac.getInstance(SIGNATURE_ALGORITHM);
+            mac.init(new SecretKeySpec(internalSecret.getBytes(StandardCharsets.UTF_8), SIGNATURE_ALGORITHM));
+            byte[] bytes = mac.doFinal(data.getBytes(StandardCharsets.UTF_8));
+            return Base64.getEncoder().encodeToString(bytes);
+        } catch (Exception e) {
+            throw new RuntimeException("签名生成失败", e);
+        }
     }
 
     @Override

@@ -14,4 +14,6 @@ public interface ProductService extends IService<Products> {
     ProductsVO getProduct(Long id);
 
     List<ProductsVO> listProducts(String keyword);
+
+    void deductStock(Long id, Integer quantity);
 }

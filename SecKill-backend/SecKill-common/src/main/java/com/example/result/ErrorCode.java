@@ -18,7 +18,14 @@ public enum ErrorCode {
     NOT_FOUND(404,"请求接口不存在"),
     LOGIN_LOCKED(1005,"失败次数过多，账号已锁定，请10分钟后再试"),
     PRODUCT_NOT_FOUND(2001,"商品不存在"),
-    ORDER_CREATE_FAILED(3001,"下单失败，请稍后再试");
+    PRODUCT_STOCK_INSUFFICIENT(2002, "库存不足"),
+    ORDER_CREATE_FAILED(3001,"下单失败，请稍后再试"),
+    ORDER_NOT_FOUND(3002,"订单不存在"),
+    SECKILL_ACTIVITY_NOT_FOUND(4001,"秒杀活动不存在"),
+    SECKILL_NOT_STARTED(4002,"秒杀未开始"),
+    SECKILL_ENDED(4003,"秒杀已结束"),
+    SECKILL_SOLD_OUT(4004,"手慢了，库存已抢完"),
+    SECKILL_REPEAT(4005,"每人限购一次，请勿重复参与");
 
     private final int code;
     private final String message;

@@ -11,6 +11,7 @@ public class ProductsVO {
     private String description;
     private BigDecimal price;
     private Integer status;
+    private Integer stock;
     private String imageUrl;
     private LocalDateTime createTime;
     private LocalDateTime updateTime;

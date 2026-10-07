@@ -1,5 +1,6 @@
 package com.example.controller;
 
+import com.example.annotation.RequiresRole;
 import com.example.model.dto.ProductsDTO;
 import com.example.model.vo.ProductsVO;
 import com.example.result.Result;
@@ -20,6 +21,7 @@ public class ProductController {
     }
 
     @PostMapping
+    @RequiresRole({"0","1"})
     public Result<Void> addProduct(@RequestBody @Valid ProductsDTO dto) {
         productService.addProduct(dto);
         return Result.success("添加商品成功");
@@ -33,5 +35,11 @@ public class ProductController {
     @GetMapping
     public Result<List<ProductsVO>> listProducts(@RequestParam(required = false) String keyword) {
         return Result.success(productService.listProducts(keyword));
+    }
+
+    @PostMapping("/{id}/deduct-stock")
+    public Result<Void> deductStock(@PathVariable Long id, @RequestParam Integer quantity) {
+        productService.deductStock(id, quantity);
+        return Result.success("扣减库存成功");
     }
 }
