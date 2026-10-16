@@ -37,9 +37,4 @@ public class ProductController {
         return Result.success(productService.listProducts(keyword));
     }
 
-    @PostMapping("/{id}/deduct-stock")
-    public Result<Void> deductStock(@PathVariable Long id, @RequestParam Integer quantity) {
-        productService.deductStock(id, quantity);
-        return Result.success("扣减库存成功");
-    }
 }

@@ -26,4 +26,4 @@ mybatis-plus:
   configuration:
     log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
 gateway:
-  internal-secret: ${GATEWAY_INTERNAL_SECRET:changeme}
+  internal-secret: ${GATEWAY_INTERNAL_SECRET}

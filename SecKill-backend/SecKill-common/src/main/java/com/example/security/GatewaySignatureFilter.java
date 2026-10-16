@@ -24,7 +24,7 @@ public class GatewaySignatureFilter implements Filter {
     private static final String SIGNATURE_ALGORITHM = "HmacSHA256";
     private final String internalSecret;
 
-    public GatewaySignatureFilter(@Value("${gateway.internal-secret:changeme}") String internalSecret) {
+    public GatewaySignatureFilter(@Value("${gateway.internal-secret}") String internalSecret) {
         this.internalSecret = internalSecret;
     }
 
@@ -33,6 +33,17 @@ public class GatewaySignatureFilter implements Filter {
             throws IOException, ServletException {
         HttpServletRequest req = (HttpServletRequest) request;
         String path = req.getRequestURI();
+
+        // 内部服务间接口：校验内部签名（与用户身份签名分离）
+        if (path.startsWith("/internal/")) {
+            String sig = req.getHeader("X-Internal-Signature");
+            if (sig == null || !verifyInternalSignature(sig)) {
+                writeUnauthorized((HttpServletResponse) response);
+                return;
+            }
+            chain.doFilter(request, response);
+            return;
+        }
 
         // 白名单放行（健康检查、Swagger、注册登录）
         if (isWhite(path, req.getMethod())) {
@@ -56,6 +67,19 @@ public class GatewaySignatureFilter implements Filter {
         chain.doFilter(request, response);
     }
 
+    private boolean verifyInternalSignature(String expected) {
+        try {
+            Mac mac = Mac.getInstance(SIGNATURE_ALGORITHM);
+            mac.init(new SecretKeySpec(internalSecret.getBytes(StandardCharsets.UTF_8), SIGNATURE_ALGORITHM));
+            byte[] bytes = mac.doFinal("INTERNAL-CALL".getBytes(StandardCharsets.UTF_8));
+            String actual = Base64.getEncoder().encodeToString(bytes);
+            return java.security.MessageDigest.isEqual(
+                    expected.getBytes(StandardCharsets.UTF_8),
+                    actual.getBytes(StandardCharsets.UTF_8));
+        } catch (Exception e) {
+            return false;
+        }
+    }
     private boolean isWhite(String path, String method) {
         return path.startsWith("/actuator/health")
                 || path.startsWith("/v3/api-docs")

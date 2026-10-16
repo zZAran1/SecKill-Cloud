@@ -11,9 +11,10 @@ import org.springframework.web.bind.annotation.RequestParam;
 @FeignClient(name = "seckill-product")
 public interface ProductClient {
 
-    @GetMapping("/products/{id}")
+    @GetMapping("/internal/products/{id}")
     Result<ProductDTO> getProduct(@PathVariable("id") Long id);
 
-    @PostMapping("/products/{id}/deduct-stock")
+    @PostMapping("/internal/products/{id}/deduct-stock")
     Result<Void> deductStock(@PathVariable("id") Long id, @RequestParam Integer quantity);
+
 }
