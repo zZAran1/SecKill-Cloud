@@ -3,7 +3,6 @@ package com.example.filter;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.security.Keys;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.cloud.gateway.filter.GlobalFilter;
@@ -18,11 +17,12 @@ import org.springframework.http.server.reactive.ServerHttpResponse;
 import org.springframework.stereotype.Component;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
-
 import javax.crypto.Mac;
-import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.StandardCharsets;
+import java.security.KeyFactory;
+import java.security.PublicKey;
+import java.security.spec.X509EncodedKeySpec;
 import java.util.Base64;
 import java.util.List;
 import java.util.Map;
@@ -41,16 +41,21 @@ public class JwtGatewayFilter implements GlobalFilter, Ordered {
     private static final List<String> GET_PREFIX_WHITE_LIST = List.of(
             "/v3/api-docs", "/swagger-ui", "/actuator/health", "/products");
 
-    private final SecretKey secretKey;
+    private final PublicKey publicKey;
     private final StringRedisTemplate redisTemplate;
     private final String internalSecret;
     private static final String SIGNATURE_HEADER = "X-Gateway-Signature";
     private static final String SIGNATURE_ALGORITHM = "HmacSHA256";
 
-    public JwtGatewayFilter(@Value("${jwt.secret}") String base64Secret,
+    public JwtGatewayFilter(@Value("${jwt.public-key}") String base64Secret,
                             @Value("${gateway.internal-secret}") String internalSecret,
                             StringRedisTemplate redisTemplate) {
-        this.secretKey = Keys.hmacShaKeyFor(Base64.getDecoder().decode(base64Secret));
+        try{
+            this.publicKey = KeyFactory.getInstance("RSA")
+                    .generatePublic(new X509EncodedKeySpec(Base64.getDecoder().decode(base64Secret)));
+        }catch (Exception e){
+            throw new IllegalArgumentException("公钥解析失败，请检查jwt.public-key配置",e);
+        }
         this.redisTemplate = redisTemplate;
         this.internalSecret =internalSecret;
     }
@@ -59,7 +64,7 @@ public class JwtGatewayFilter implements GlobalFilter, Ordered {
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
         ServerHttpRequest request = exchange.getRequest();
         String path = request.getPath().value();
-
+        String timestamp = String.valueOf(System.currentTimeMillis());
         // 0. 安全前置:剥离客户端伪造的身份头,防止绕过网关注入
         ServerHttpRequest cleaned = request.mutate()
                 .headers(h -> {
@@ -84,7 +89,7 @@ public class JwtGatewayFilter implements GlobalFilter, Ordered {
         }
         Claims claims;
         try {
-            claims = Jwts.parser().verifyWith(secretKey).build()
+            claims = Jwts.parser().verifyWith(publicKey).build()
                     .parseSignedClaims(auth.substring(7)).getPayload();
         } catch (JwtException | IllegalArgumentException e) {
             return unauthorized(exchange);   // 过期/篡改/格式错误统一 401
@@ -113,7 +118,8 @@ public class JwtGatewayFilter implements GlobalFilter, Ordered {
                     h.set("X-Username", String.valueOf(claims.get("username")));
                     h.set("X-Role", String.valueOf(claims.get("role")));
                     h.set("X-Status", String.valueOf(claims.get("status")));
-                    h.set(SIGNATURE_HEADER, generateSignature(claims.getSubject(), String.valueOf(claims.get("role"))));
+                    h.set("X-Gateway-Timestamp", timestamp);
+                    h.set(SIGNATURE_HEADER, generateSignature(claims.getSubject(), String.valueOf(claims.get("role")),timestamp));
                 })
                 .build();
         return chain.filter(exchange.mutate().request(mutated).build());
@@ -137,9 +143,9 @@ public class JwtGatewayFilter implements GlobalFilter, Ordered {
         return response.writeWith(Mono.just(response.bufferFactory().wrap(body)));
     }
 
-    private String generateSignature(String userId, String role) {
+    private String generateSignature(String userId, String role,String timestamp) {
         try {
-            String data = "X-User-Id=" + userId + "&X-Role=" + role;
+            String data = "X-User-Id=" + userId + "&X-Role=" + role + "&X-Timestamp=" + timestamp;
             Mac mac = Mac.getInstance(SIGNATURE_ALGORITHM);
             mac.init(new SecretKeySpec(internalSecret.getBytes(StandardCharsets.UTF_8), SIGNATURE_ALGORITHM));
             byte[] bytes = mac.doFinal(data.getBytes(StandardCharsets.UTF_8));

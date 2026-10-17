@@ -61,7 +61,7 @@ spring:
 
 # JWT 配置:验签用(签发还是在 user 服务)
 jwt:
-  secret: ${JWT_SECRET}
+  public-key: ${JWT_PUBLIC_SECRET}
   expiration: ${JWT_EXPIRATION}
 gateway:
   internal-secret: ${GATEWAY_INTERNAL_SECRET}

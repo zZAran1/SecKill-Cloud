@@ -15,7 +15,8 @@ springdoc:
   api-docs:
     enabled: false
 jwt:
-  secret: ${JWT_SECRET}
+  private-key: ${JWT_PRIVATE_SECRET}
+  public-key: ${JWT_PUBLIC_SECRET}
   expiration: ${JWT_EXPIRATION}
 gateway:
   internal-secret: ${GATEWAY_INTERNAL_SECRET}

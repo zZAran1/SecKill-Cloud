@@ -31,3 +31,6 @@ springdoc:
 
 gateway:
   internal-secret: ${GATEWAY_INTERNAL_SECRET}
+jwt:
+  public-key: ${JWT_PUBLIC_SECRET}
+  expiration: ${JWT_EXPIRATION}

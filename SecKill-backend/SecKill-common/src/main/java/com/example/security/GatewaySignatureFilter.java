@@ -59,7 +59,8 @@ public class GatewaySignatureFilter implements Filter {
 
         String userId = req.getHeader("X-User-Id");
         String role = req.getHeader("X-Role");
-        if (!verifySignature(userId, role, expected)) {
+        String timestamp = req.getHeader("X-Gateway-Timestamp");
+        if(timestamp == null || !isTimestampValid(timestamp) || !verifySignature(userId,role,expected,timestamp)) {
             writeUnauthorized((HttpServletResponse) response);
             return;
         }
@@ -84,12 +85,13 @@ public class GatewaySignatureFilter implements Filter {
         return path.startsWith("/actuator/health")
                 || path.startsWith("/v3/api-docs")
                 || path.startsWith("/swagger-ui")
-                || (path.equals("/users") && "POST".equalsIgnoreCase(method));
+                || (path.equals("/users") && "POST".equalsIgnoreCase(method))
+                || (path.equals("/users/login") && "POST".equalsIgnoreCase(method));
     }
 
-    private boolean verifySignature(String userId, String role, String expected) {
+    private boolean verifySignature(String userId, String role, String expected ,String timestamp) {
         try {
-            String data = "X-User-Id=" + userId + "&X-Role=" + role;
+            String data = "X-User-Id=" + userId + "&X-Role=" + role + "&X-Timestamp=" + timestamp;
             Mac mac = Mac.getInstance(SIGNATURE_ALGORITHM);
             mac.init(new SecretKeySpec(internalSecret.getBytes(StandardCharsets.UTF_8), SIGNATURE_ALGORITHM));
             byte[] bytes = mac.doFinal(data.getBytes(StandardCharsets.UTF_8));
@@ -106,5 +108,14 @@ public class GatewaySignatureFilter implements Filter {
         resp.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
         resp.setContentType("application/json;charset=UTF-8");
         resp.getWriter().write("{\"code\":401,\"message\":\"未登录或登录已过期\"}");
+    }
+
+    private boolean isTimestampValid(String timestamp) {
+        try{
+            long ts = Long.parseLong(timestamp);
+            return Math.abs(System.currentTimeMillis()-ts)<= 5*60*1000L;
+        }catch (NumberFormatException e){
+            return false;
+        }
     }
 }
