@@ -1,0 +1,176 @@
+# 秒杀系统一键部署编排：4 个中间件 + 4 个微服务 + 前端
+# 使用前先在本目录准备 .env 文件（见 .env 模板）
+name: seckill
+
+services:
+  # ===== 中间件 =====
+  mysql:
+    image: mysql:8.0
+    container_name: seckill-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      TZ: Asia/Shanghai
+    ports:
+      - "3306:3306"        # 仅调试用（方便用客户端工具连库），生产可去掉
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./docker/mysql/init.sql:/docker-entrypoint-initdb.d/init.sql
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+
+  redis:
+    image: redis:7-alpine
+    container_name: seckill-redis
+    command: redis-server --requirepass ${REDIS_PASSWORD}
+    ports:
+      - "6379:6379"        # 仅调试用
+    volumes:
+      - redis-data:/data
+
+  rabbitmq:
+    image: rabbitmq:3.13-management
+    container_name: seckill-rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USERNAME}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
+    ports:
+      - "5672:5672"
+      - "15672:15672"      # 管理控制台，仅调试用
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+
+  nacos:
+    image: nacos/nacos-server:v2.3.2
+    container_name: seckill-nacos
+    environment:
+      MODE: standalone
+      TZ: Asia/Shanghai
+    ports:
+      - "8848:8848"        # 控制台
+      - "9848:9848"        # Nacos 2.x gRPC 端口（8848+1000），客户端注册必须能通
+    volumes:
+      - nacos-data:/home/nacos/data
+
+  # ===== 微服务（8081-8083 不对外暴露，只在容器网络内互通，与安全审查建议一致）=====
+  gateway:
+    build:
+      context: ./SecKill-backend
+      dockerfile: SecKill-gateway/Dockerfile
+    container_name: seckill-gateway
+    restart: unless-stopped   # 首次启动若 MySQL/Nacos 未就绪，自动重启重试
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      NACOS_ADDR: nacos:8848
+      # 置空 = 让 Nacos 自动探测容器 IP（Docker 网络内 eth0 就是正确地址）；
+      # 不能用默认的 127.0.0.1，否则注册的地址其他容器无法访问
+      NACOS_DISCOVERY_IP: ""
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+      JWT_PUBLIC_KEY: ${JWT_PUBLIC_KEY}
+      JWT_EXPIRATION: ${JWT_EXPIRATION}
+      GATEWAY_INTERNAL_SECRET: ${GATEWAY_INTERNAL_SECRET}
+    ports:
+      - "8080:8080"        # 对外入口（前端 Nginx 反代到这里）
+    depends_on:
+      - nacos
+      - redis
+
+  user:
+    build:
+      context: ./SecKill-backend
+      dockerfile: SecKill-user/Dockerfile
+    container_name: seckill-user
+    restart: unless-stopped
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      NACOS_ADDR: nacos:8848
+      NACOS_DISCOVERY_IP: ""
+      DB_HOST: mysql
+      DB_PORT: "3306"
+      DB_NAME: seckill_user
+      DB_USERNAME: seckill
+      DB_PASSWORD: ${DB_PASSWORD}
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+      JWT_PRIVATE_KEY: ${JWT_PRIVATE_KEY}
+      JWT_PUBLIC_KEY: ${JWT_PUBLIC_KEY}
+      JWT_EXPIRATION: ${JWT_EXPIRATION}
+      GATEWAY_INTERNAL_SECRET: ${GATEWAY_INTERNAL_SECRET}
+    depends_on:
+      - mysql
+      - redis
+      - nacos
+
+  product:
+    build:
+      context: ./SecKill-backend
+      dockerfile: SecKill-product/Dockerfile
+    container_name: seckill-product
+    restart: unless-stopped
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      NACOS_ADDR: nacos:8848
+      NACOS_DISCOVERY_IP: ""
+      DB_HOST: mysql
+      DB_PORT: "3306"
+      DB_NAME: seckill_product
+      DB_USERNAME: seckill
+      DB_PASSWORD: ${DB_PASSWORD}
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+      JWT_PUBLIC_KEY: ${JWT_PUBLIC_KEY}
+      JWT_EXPIRATION: ${JWT_EXPIRATION}
+      GATEWAY_INTERNAL_SECRET: ${GATEWAY_INTERNAL_SECRET}
+    depends_on:
+      - mysql
+      - redis
+      - nacos
+
+  order:
+    build:
+      context: ./SecKill-backend
+      dockerfile: SecKill-order/Dockerfile
+    container_name: seckill-order
+    restart: unless-stopped
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      NACOS_ADDR: nacos:8848
+      NACOS_DISCOVERY_IP: ""
+      DB_HOST: mysql
+      DB_PORT: "3306"
+      DB_NAME: seckill_order
+      DB_USERNAME: seckill
+      DB_PASSWORD: ${DB_PASSWORD}
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: "5672"
+      RABBITMQ_USERNAME: ${RABBITMQ_USERNAME}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
+      JWT_PUBLIC_KEY: ${JWT_PUBLIC_KEY}
+      JWT_EXPIRATION: ${JWT_EXPIRATION}
+      GATEWAY_INTERNAL_SECRET: ${GATEWAY_INTERNAL_SECRET}
+    depends_on:
+      - mysql
+      - redis
+      - rabbitmq
+      - nacos
+
+  # ===== 前端：Nginx 托管 dist，/api 反代到 gateway =====
+  frontend:
+    build: ./seckill-frontend
+    container_name: seckill-frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"            # 用户访问入口
+    depends_on:
+      - gateway
+
+volumes:
+  mysql-data:
+  redis-data:
+  rabbitmq-data:
+  nacos-data:

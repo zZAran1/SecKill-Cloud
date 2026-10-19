@@ -17,4 +17,7 @@ public interface ProductClient {
     @PostMapping("/internal/products/{id}/deduct-stock")
     Result<Void> deductStock(@PathVariable("id") Long id, @RequestParam Integer quantity);
 
+    @PostMapping("/internal/products/{id}/restore-stock")
+    Result<Void> restoreStock(@PathVariable("id") Long id, @RequestParam Integer quantity);
+
 }

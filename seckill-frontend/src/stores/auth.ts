@@ -1,6 +1,6 @@
 import { computed, reactive } from 'vue'
-import { TOKEN_KEY } from '@/api/http'
 import { userApi } from '@/api/user'
+import { clearToken, getToken, setToken } from '@/utils/security'
 import type { LoginPayload, RegisterPayload, UserInfo } from '@/types'
 
 const USER_KEY = 'seckill.user'
@@ -12,7 +12,7 @@ interface AuthState {
 
 function readUser(): UserInfo | null {
   try {
-    const raw = localStorage.getItem(USER_KEY)
+    const raw = sessionStorage.getItem(USER_KEY)
     return raw ? (JSON.parse(raw) as UserInfo) : null
   } catch {
     return null
@@ -20,16 +20,16 @@ function readUser(): UserInfo | null {
 }
 
 const state = reactive<AuthState>({
-  token: localStorage.getItem(TOKEN_KEY),
+  token: getToken(),
   user: readUser(),
 })
 
 function persist() {
-  if (state.token) localStorage.setItem(TOKEN_KEY, state.token)
-  else localStorage.removeItem(TOKEN_KEY)
+  if (state.token) setToken(state.token)
+  else clearToken()
 
-  if (state.user) localStorage.setItem(USER_KEY, JSON.stringify(state.user))
-  else localStorage.removeItem(USER_KEY)
+  if (state.user) sessionStorage.setItem(USER_KEY, JSON.stringify(state.user))
+  else sessionStorage.removeItem(USER_KEY)
 }
 
 /** 登录态 store（模块级单例，避免额外引入状态库） */

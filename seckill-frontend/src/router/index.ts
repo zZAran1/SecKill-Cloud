@@ -47,6 +47,42 @@ const router = createRouter({
       meta: { title: '商品详情' },
     },
     {
+      path: '/products/:id(\\d+)/edit',
+      name: 'product-edit',
+      component: () => import('@/views/ProductEditView.vue'),
+      meta: { title: '编辑商品', requiresAuth: true, requiresAdmin: true },
+    },
+    {
+      path: '/seckill',
+      name: 'seckill',
+      component: () => import('@/views/SeckillView.vue'),
+      meta: { title: '秒杀专场' },
+    },
+    {
+      path: '/admin/activities',
+      name: 'admin-activities',
+      component: () => import('@/views/AdminActivityView.vue'),
+      meta: { title: '活动管理', requiresAuth: true, requiresAdmin: true },
+    },
+    {
+      path: '/admin/users',
+      name: 'admin-users',
+      component: () => import('@/views/AdminUserView.vue'),
+      meta: { title: '用户管理', requiresAuth: true, requiresAdmin: true },
+    },
+    {
+      path: '/admin/orders',
+      name: 'admin-orders',
+      component: () => import('@/views/AdminOrderView.vue'),
+      meta: { title: '订单管理', requiresAuth: true, requiresAdmin: true },
+    },
+    {
+      path: '/orders',
+      name: 'orders',
+      component: () => import('@/views/OrdersView.vue'),
+      meta: { title: '我的订单', requiresAuth: true },
+    },
+    {
       path: '/profile',
       name: 'profile',
       component: () => import('@/views/ProfileView.vue'),

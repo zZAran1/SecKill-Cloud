@@ -37,9 +37,10 @@ public class JwtGatewayFilter implements GlobalFilter, Ordered {
             "/users", Set.of(HttpMethod.POST),
             "/users/login", Set.of(HttpMethod.POST));
 
-    // 前缀匹配：仅 GET 放行（文档、健康检查、商品浏览）
+    // 前缀匹配：仅 GET 放行（文档、健康检查、商品浏览、秒杀活动浏览）
+    // 注意：这里放行的请求不会注入身份头，下游 GatewaySignatureFilter 的白名单必须同步放行，否则会被 401
     private static final List<String> GET_PREFIX_WHITE_LIST = List.of(
-            "/v3/api-docs", "/swagger-ui", "/actuator/health", "/products");
+            "/v3/api-docs", "/swagger-ui", "/actuator/health", "/products", "/seckill-activities");
 
     private final PublicKey publicKey;
     private final StringRedisTemplate redisTemplate;
@@ -101,7 +102,12 @@ public class JwtGatewayFilter implements GlobalFilter, Ordered {
                 redisTemplate.hasKey("token:blacklist:" + jti))) {
             return unauthorized(exchange);
         }
-
+        String disabledAt = redisTemplate.opsForValue().get("user:blacklist:" + claims.getSubject());
+        if(disabledAt != null
+                && claims.getIssuedAt() != null
+                && claims.getIssuedAt().getTime() <= Long.parseLong(disabledAt)){
+            return unauthorized(exchange);
+        }
         // 4. 登出请求:把 jti 拉黑,剩余有效期作为黑名单 TTL
         if ("/users/logout".equals(path) && jti != null) {
             long ttl = claims.getExpiration().getTime() - System.currentTimeMillis();

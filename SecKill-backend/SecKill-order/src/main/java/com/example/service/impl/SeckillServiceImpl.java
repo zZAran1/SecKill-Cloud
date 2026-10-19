@@ -1,13 +1,20 @@
 package com.example.service.impl;
 
 import com.example.config.RabbitMQConfig;
+import com.example.constant.SeckillRedisKeys;
 import com.example.exception.BaseBusinessException;
 import com.example.message.SeckillOrderMessage;
+import com.example.model.OrderStatus;
 import com.example.model.dto.SeckillActivityDTO;
+import com.example.model.entity.Order;
+import com.example.model.vo.SeckillResultVO;
 import com.example.result.ErrorCode;
 import com.example.security.UserContext;
+import com.example.service.OrderService;
 import com.example.service.SeckillService;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
@@ -18,10 +25,12 @@ import java.util.List;
 
 @Service
 public class SeckillServiceImpl implements SeckillService {
+    private static final Logger log = LoggerFactory.getLogger(SeckillServiceImpl.class);
 
-    private static final String ACTIVITY_KEY = "seckill:activity:";
-    private static final String STOCK_KEY = "seckill:stock:";
-    private static final String USERS_KEY = "seckill:users:";
+    private final StringRedisTemplate redisTemplate;
+    private final ObjectMapper objectMapper;
+    private final RabbitTemplate rabbitTemplate;
+    private final OrderService orderService;
 
     // Lua 脚本：原子完成 防重检查 + 库存检查 + 扣库存 + 记录用户
     private static final DefaultRedisScript<Long> SECKILL_SCRIPT = new DefaultRedisScript<>();
@@ -41,16 +50,14 @@ public class SeckillServiceImpl implements SeckillService {
         SECKILL_SCRIPT.setResultType(Long.class);
     }
 
-    private final StringRedisTemplate redisTemplate;
-    private final ObjectMapper objectMapper;
-    private final RabbitTemplate rabbitTemplate;
-
     public SeckillServiceImpl(StringRedisTemplate redisTemplate,
                               ObjectMapper objectMapper,
-                              RabbitTemplate rabbitTemplate) {
+                              RabbitTemplate rabbitTemplate,
+                              OrderService orderService) {
         this.redisTemplate = redisTemplate;
         this.objectMapper = objectMapper;
         this.rabbitTemplate = rabbitTemplate;
+        this.orderService = orderService;
     }
 
     @Override
@@ -58,7 +65,7 @@ public class SeckillServiceImpl implements SeckillService {
         Long userId = UserContext.getUserId();
 
         // 1. 读活动信息（Redis）
-        String activityJson = redisTemplate.opsForValue().get(ACTIVITY_KEY + activityId);
+        String activityJson = redisTemplate.opsForValue().get(SeckillRedisKeys.ACTIVITY_KEY + activityId);
         if (activityJson == null) {
             throw new BaseBusinessException(ErrorCode.SECKILL_ACTIVITY_NOT_FOUND);
         }
@@ -80,7 +87,7 @@ public class SeckillServiceImpl implements SeckillService {
 
         // 3. Lua 原子扣减
         Long result = redisTemplate.execute(SECKILL_SCRIPT,
-                List.of(STOCK_KEY + activityId, USERS_KEY + activityId),
+                List.of(SeckillRedisKeys.STOCK_KEY + activityId, SeckillRedisKeys.USERS_KEY + activityId),
                 String.valueOf(userId));
         if (result == null) {
             throw new BaseBusinessException(ErrorCode.SYSTEM_ERROR);
@@ -98,16 +105,54 @@ public class SeckillServiceImpl implements SeckillService {
         message.setProductId(activity.getProductId());
         message.setActivityId(activityId);
         message.setSeckillPrice(activity.getSeckillPrice());
-
         // 使用订单号作为 CorrelationId，便于追踪
         org.springframework.amqp.rabbit.connection.CorrelationData correlationData =
                 new org.springframework.amqp.rabbit.connection.CorrelationData("seckill-" + userId + "-" + activityId);
 
-        rabbitTemplate.convertAndSend(
-                RabbitMQConfig.SECKILL_ORDER_EXCHANGE,
-                RabbitMQConfig.SECKILL_ORDER_ROUTING_KEY,
-                message,
-                correlationData  // 携带 CorrelationData
-        );
+        try{
+            rabbitTemplate.convertAndSend(
+                    RabbitMQConfig.SECKILL_ORDER_EXCHANGE,
+                    RabbitMQConfig.SECKILL_ORDER_ROUTING_KEY,
+                    message,
+                    correlationData  // 携带 CorrelationData
+            );
+        }catch (Exception e){
+            restoreStock(activityId ,userId);
+            throw new BaseBusinessException(ErrorCode.SYSTEM_ERROR);
+        }
+    }
+
+    @Override
+    public SeckillResultVO getResult(Long activityId) {
+        Long userId = UserContext.getUserId();
+
+        // 1. 订单已落地（且没被取消）→ 抢购成功
+        Order order = orderService.lambdaQuery()
+                .eq(Order::getUserId, userId)
+                .eq(Order::getActivityId, activityId)
+                .one();
+        if (order != null && order.getStatus() != OrderStatus.CANCELLED) {
+            return SeckillResultVO.success(order.getOrderNo(), order.getStatus());
+        }
+
+        // 2. 没订单但还在已参与集合里 → 消息还在排队建单
+        Boolean joined = redisTemplate.opsForSet()
+                .isMember(SeckillRedisKeys.USERS_KEY + activityId, String.valueOf(userId));
+        if (Boolean.TRUE.equals(joined)) {
+            return SeckillResultVO.queuing();
+        }
+
+        // 3. 既没订单也没参与标记 → 未抢到（或订单已取消，资格已释放）
+        return SeckillResultVO.failed();
+    }
+
+    private void restoreStock(Long activityId,Long userId) {
+        try{
+            redisTemplate.execute(SeckillRedisKeys.RESTORE_SCRIPT,
+                    List.of(SeckillRedisKeys.STOCK_KEY + activityId, SeckillRedisKeys.USERS_KEY + activityId),
+                    String.valueOf(userId));
+        }catch (Exception e){
+            log.error("库存回补失败 activityId={}, userId={}",activityId,userId,e);
+        }
     }
 }

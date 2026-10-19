@@ -3,6 +3,7 @@ import { reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuth } from '@/stores/auth'
 import { useToast } from '@/utils/toast'
+import { isSafeRedirect } from '@/utils/security'
 
 const route = useRoute()
 const router = useRouter()
@@ -37,7 +38,8 @@ async function submit() {
   try {
     await login({ phone: form.phone.trim(), password: form.password })
     toast.show('登录成功，欢迎回来', 'success')
-    router.push((route.query.redirect as string) || '/products')
+    // 仅允许站内相对路径，防开放重定向
+    router.push(isSafeRedirect(route.query.redirect) ? route.query.redirect : { name: 'products' })
   } catch (e) {
     serverError.value = e instanceof Error ? e.message : '登录失败，请稍后再试'
   } finally {

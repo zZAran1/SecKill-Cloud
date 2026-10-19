@@ -8,7 +8,7 @@ spring:
     nacos:
       discovery:
         server-addr: ${NACOS_ADDR:127.0.0.1:8848}
-        ip: 127.0.0.1
+        ip: ${NACOS_DISCOVERY_IP:127.0.0.1}
     gateway:
       routes:
         # 用户服务路由
@@ -61,7 +61,7 @@ spring:
 
 # JWT 配置:验签用(签发还是在 user 服务)
 jwt:
-  public-key: ${JWT_PUBLIC_SECRET}
+  public-key: ${JWT_PUBLIC_KEY}
   expiration: ${JWT_EXPIRATION}
 gateway:
   internal-secret: ${GATEWAY_INTERNAL_SECRET}

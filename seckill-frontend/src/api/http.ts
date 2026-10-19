@@ -1,8 +1,7 @@
 import axios, { AxiosError } from 'axios'
 import type { Result } from '@/types'
 import { ApiError } from '@/types'
-
-export const TOKEN_KEY = 'seckill.token'
+import { clearToken, getToken, isTokenExpired } from '@/utils/security'
 
 /** 登录态失效时的回调（由 main.ts 注入，负责清理状态并视情况跳转登录页） */
 let onUnauthorized: (() => void) | null = null
@@ -10,14 +9,21 @@ export function setUnauthorizedHandler(fn: () => void) {
   onUnauthorized = fn
 }
 
+// 统一经网关（8080）访问：鉴权、验签、限流全部由网关收敛
 const http = axios.create({
-  baseURL: '/api',
+  baseURL: import.meta.env.VITE_API_BASE_URL || '/api',
   timeout: 15000,
 })
 
 http.interceptors.request.use((config) => {
-  const token = localStorage.getItem(TOKEN_KEY)
+  const token = getToken()
   if (token) {
+    // 本地先行拦截已过期令牌，避免发出必然失败的请求
+    if (isTokenExpired(token)) {
+      clearToken()
+      onUnauthorized?.()
+      return Promise.reject(new ApiError(401, '登录已过期，请重新登录'))
+    }
     config.headers.Authorization = `Bearer ${token}`
   }
   return config
@@ -53,6 +59,10 @@ http.interceptors.response.use(
         throw new ApiError(401, body.msg || '未登录或登录已过期')
       }
       throw new ApiError(401, '访问被拒绝，请稍后重试')
+    }
+
+    if (status === 429) {
+      throw new ApiError(429, '操作过于频繁，请稍后再试')
     }
 
     if (isResultBody(body)) {

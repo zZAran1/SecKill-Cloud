@@ -21,6 +21,13 @@ public class InternalProductController {
         return Result.success("扣减库存成功");
     }
 
+    /**订单取消/超时关闭时回补库存*/
+    @PostMapping("/{id}/restore-stock")
+    public Result<Void> restoreStock(@PathVariable Long id, @RequestParam Integer quantity) {
+        productService.restoreStock(id, quantity);
+        return Result.success("库存回补成功");
+    }
+
     @GetMapping("{id}")
     public Result<ProductsVO>  getProducts(@PathVariable Long id) {
         return Result.success(productService.getProduct(id));

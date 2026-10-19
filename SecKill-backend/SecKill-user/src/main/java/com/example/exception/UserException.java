@@ -6,4 +6,8 @@ public class UserException extends BaseBusinessException {
     public UserException(ErrorCode errorCode) {
         super(errorCode);
     }
+
+    public UserException(ErrorCode errorCode, String message) {
+        super(errorCode, message);
+    }
 }

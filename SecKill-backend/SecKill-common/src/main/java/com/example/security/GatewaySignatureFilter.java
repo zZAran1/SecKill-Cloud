@@ -15,6 +15,7 @@ import javax.crypto.spec.SecretKeySpec;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
+import java.util.List;
 
 @Component
 @Order(Ordered.HIGHEST_PRECEDENCE)
@@ -22,6 +23,11 @@ public class GatewaySignatureFilter implements Filter {
 
     private static final String SIGNATURE_HEADER = "X-Gateway-Signature";
     private static final String SIGNATURE_ALGORITHM = "HmacSHA256";
+
+    /**公开浏览路径：仅 GET 放行，必须与网关 JwtGatewayFilter.GET_PREFIX_WHITE_LIST 保持一致*/
+    private static final List<String> GET_PREFIX_WHITE_LIST = List.of(
+            "/products", "/seckill-activities");
+
     private final String internalSecret;
 
     public GatewaySignatureFilter(@Value("${gateway.internal-secret}") String internalSecret) {
@@ -82,11 +88,19 @@ public class GatewaySignatureFilter implements Filter {
         }
     }
     private boolean isWhite(String path, String method) {
-        return path.startsWith("/actuator/health")
+        if (path.startsWith("/actuator/health")
                 || path.startsWith("/v3/api-docs")
-                || path.startsWith("/swagger-ui")
-                || (path.equals("/users") && "POST".equalsIgnoreCase(method))
-                || (path.equals("/users/login") && "POST".equalsIgnoreCase(method));
+                || path.startsWith("/swagger-ui")) {
+            return true;
+        }
+        if ((path.equals("/users") || path.equals("/users/login"))
+                && "POST".equalsIgnoreCase(method)) {
+            return true;
+        }
+        // 公开浏览接口：网关放行后不注入身份头，这里必须同步放行，否则匿名浏览会被 401
+        // 与网关 JwtGatewayFilter.GET_PREFIX_WHITE_LIST 保持一致
+        return "GET".equalsIgnoreCase(method)
+                && GET_PREFIX_WHITE_LIST.stream().anyMatch(path::startsWith);
     }
 
     private boolean verifySignature(String userId, String role, String expected ,String timestamp) {

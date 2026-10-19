@@ -27,7 +27,14 @@ async function onLogout() {
 
       <nav class="nav">
         <router-link :to="{ name: 'products' }" class="nav-link" active-class="on">全部商品</router-link>
-        <router-link v-if="isAdmin" :to="{ name: 'product-new' }" class="nav-link" active-class="on">发布商品</router-link>
+        <router-link :to="{ name: 'seckill' }" class="nav-link" active-class="on">秒杀专场</router-link>
+        <router-link v-if="isLoggedIn" :to="{ name: 'orders' }" class="nav-link" active-class="on">我的订单</router-link>
+        <template v-if="isAdmin">
+          <router-link :to="{ name: 'product-new' }" class="nav-link" active-class="on">发布商品</router-link>
+          <router-link :to="{ name: 'admin-activities' }" class="nav-link" active-class="on">活动管理</router-link>
+          <router-link :to="{ name: 'admin-orders' }" class="nav-link" active-class="on">订单管理</router-link>
+          <router-link :to="{ name: 'admin-users' }" class="nav-link" active-class="on">用户管理</router-link>
+        </template>
       </nav>
 
       <div class="header-side">

@@ -16,6 +16,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DuplicateKeyException;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -34,12 +35,14 @@ class UserServiceImplTest {
     LoginFailLimiter loginFailLimiter;
     @Mock
     UserMapper userMapper;
+    @Mock
+    StringRedisTemplate redisTemplate;
 
     UserServiceImpl userService;
 
     @BeforeEach
     void setUp() {
-        userService = new UserServiceImpl(passwordEncoder, jwtUtil, loginFailLimiter);
+        userService = new UserServiceImpl(passwordEncoder, jwtUtil, loginFailLimiter, redisTemplate);
         ReflectionTestUtils.setField(userService, "baseMapper", userMapper);
     }
 

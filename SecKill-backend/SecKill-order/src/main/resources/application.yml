@@ -14,11 +14,15 @@ spring:
     nacos:
       discovery:
         server-addr: ${NACOS_ADDR:127.0.0.1:8848}
-        ip: 127.0.0.1
+        ip: ${NACOS_DISCOVERY_IP:127.0.0.1}
 
 mybatis-plus:
   configuration:
     map-underscore-to-camel-case: true
+
+# 订单支付超时时间：下单写 expire_time 与延迟队列 TTL 共用这一个值，避免两处配置漂移
+order:
+  pay-timeout-minutes: ${ORDER_PAY_TIMEOUT_MINUTES:15}
 
 management:
   endpoints:

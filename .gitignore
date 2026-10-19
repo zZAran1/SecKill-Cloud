@@ -8,3 +8,6 @@ target/
 logs/
 SecKill-backend/.run/
 .env
+.env
+*.der
+*.pem
