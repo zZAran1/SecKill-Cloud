@@ -77,6 +77,12 @@ const router = createRouter({
       meta: { title: '订单管理', requiresAuth: true, requiresAdmin: true },
     },
     {
+      path: '/admin/refunds',
+      name: 'admin-refunds',
+      component: () => import('@/views/AdminRefundView.vue'),
+      meta: { title: '退款审核', requiresAuth: true, requiresAdmin: true },
+    },
+    {
       path: '/orders',
       name: 'orders',
       component: () => import('@/views/OrdersView.vue'),

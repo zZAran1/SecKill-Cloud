@@ -1,0 +1,12 @@
+# Alertmanager 最小配置：告警按服务聚合、去重
+# 生产在 receivers 下补 webhook_configs / email_configs 接通知渠道；
+# 当前 receiver 为空，告警仅在 Alertmanager 界面（9093）查看
+route:
+  receiver: 'default'
+  group_by: ['alertname', 'service']
+  group_wait: 10s
+  group_interval: 30s
+  repeat_interval: 1h
+
+receivers:
+  - name: 'default'

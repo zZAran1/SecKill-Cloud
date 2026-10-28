@@ -11,7 +11,7 @@ services:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
       TZ: Asia/Shanghai
     ports:
-      - "3306:3306"        # 仅调试用（方便用客户端工具连库），生产可去掉
+      - "3307:3306"        # 仅调试用；宿主机 3306 被本地 MySQL 占用，映射到 3307
     volumes:
       - mysql-data:/var/lib/mysql
       - ./docker/mysql/init.sql:/docker-entrypoint-initdb.d/init.sql
@@ -55,10 +55,16 @@ services:
     build:
       context: ./SecKill-backend
       dockerfile: SecKill-gateway/Dockerfile
+    image: seckill-gateway:${IMAGE_TAG:-latest}   # 版本化：IMAGE_TAG 传 git SHA，默认 latest
     container_name: seckill-gateway
     restart: unless-stopped   # 首次启动若 MySQL/Nacos 未就绪，自动重启重试
+    # 容器资源上限：与镜像内 -XX:MaxRAMPercentage=75 联动自动推算堆内存
+    mem_limit: 512m
+    cpus: 1.0
     environment:
       SPRING_PROFILES_ACTIVE: prod
+      # JVM 时区与业务时区统一，否则秒杀时间窗口判断会因 UTC/本地时差误判
+      TZ: Asia/Shanghai
       NACOS_ADDR: nacos:8848
       # 置空 = 让 Nacos 自动探测容器 IP（Docker 网络内 eth0 就是正确地址）；
       # 不能用默认的 127.0.0.1，否则注册的地址其他容器无法访问
@@ -79,10 +85,15 @@ services:
     build:
       context: ./SecKill-backend
       dockerfile: SecKill-user/Dockerfile
+    image: seckill-user:${IMAGE_TAG:-latest}
     container_name: seckill-user
     restart: unless-stopped
+    # 容器资源上限：与镜像内 -XX:MaxRAMPercentage=75 联动自动推算堆内存
+    mem_limit: 768m
+    cpus: 1.0
     environment:
       SPRING_PROFILES_ACTIVE: prod
+      TZ: Asia/Shanghai
       NACOS_ADDR: nacos:8848
       NACOS_DISCOVERY_IP: ""
       DB_HOST: mysql
@@ -96,6 +107,7 @@ services:
       JWT_PRIVATE_KEY: ${JWT_PRIVATE_KEY}
       JWT_PUBLIC_KEY: ${JWT_PUBLIC_KEY}
       JWT_EXPIRATION: ${JWT_EXPIRATION}
+      JWT_REFRESH_EXPIRATION: ${JWT_REFRESH_EXPIRATION}
       GATEWAY_INTERNAL_SECRET: ${GATEWAY_INTERNAL_SECRET}
     depends_on:
       - mysql
@@ -106,10 +118,15 @@ services:
     build:
       context: ./SecKill-backend
       dockerfile: SecKill-product/Dockerfile
+    image: seckill-product:${IMAGE_TAG:-latest}
     container_name: seckill-product
     restart: unless-stopped
+    # 容器资源上限：与镜像内 -XX:MaxRAMPercentage=75 联动自动推算堆内存
+    mem_limit: 768m
+    cpus: 1.0
     environment:
       SPRING_PROFILES_ACTIVE: prod
+      TZ: Asia/Shanghai
       NACOS_ADDR: nacos:8848
       NACOS_DISCOVERY_IP: ""
       DB_HOST: mysql
@@ -132,10 +149,15 @@ services:
     build:
       context: ./SecKill-backend
       dockerfile: SecKill-order/Dockerfile
+    image: seckill-order:${IMAGE_TAG:-latest}
     container_name: seckill-order
     restart: unless-stopped
+    # 容器资源上限：与镜像内 -XX:MaxRAMPercentage=75 联动自动推算堆内存
+    mem_limit: 768m
+    cpus: 1.0
     environment:
       SPRING_PROFILES_ACTIVE: prod
+      TZ: Asia/Shanghai
       NACOS_ADDR: nacos:8848
       NACOS_DISCOVERY_IP: ""
       DB_HOST: mysql
@@ -153,19 +175,67 @@ services:
       JWT_PUBLIC_KEY: ${JWT_PUBLIC_KEY}
       JWT_EXPIRATION: ${JWT_EXPIRATION}
       GATEWAY_INTERNAL_SECRET: ${GATEWAY_INTERNAL_SECRET}
+      PAYMENT_SECRET: ${PAYMENT_SECRET}
     depends_on:
       - mysql
       - redis
       - rabbitmq
       - nacos
 
+  # ===== 可观测性：Prometheus 指标收集 + Alertmanager 告警 + Grafana 仪表盘 =====
+  prometheus:
+    image: prom/prometheus:v2.53.0
+    container_name: seckill-prometheus
+    restart: unless-stopped
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+    volumes:
+      - ./docker/monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./docker/monitoring/alerts.yml:/etc/prometheus/alerts.yml:ro
+      - prometheus-data:/prometheus
+    ports:
+      - "9090:9090"        # Prometheus 控制台，仅调试用
+    depends_on:
+      - gateway
+      - user
+      - product
+      - order
+
+  alertmanager:
+    image: prom/alertmanager:v0.27.0
+    container_name: seckill-alertmanager
+    restart: unless-stopped
+    volumes:
+      - ./docker/monitoring/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+    ports:
+      - "9093:9093"        # 告警列表页，仅调试用
+    depends_on:
+      - prometheus
+
+  grafana:
+    image: grafana/grafana:11.1.0
+    container_name: seckill-grafana
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD}
+    volumes:
+      - ./docker/monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./docker/monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    ports:
+      - "3000:3000"        # Grafana 仪表盘，仅调试用
+    depends_on:
+      - prometheus
+
   # ===== 前端：Nginx 托管 dist，/api 反代到 gateway =====
   frontend:
     build: ./seckill-frontend
+    image: seckill-frontend:${IMAGE_TAG:-latest}
     container_name: seckill-frontend
     restart: unless-stopped
     ports:
-      - "80:80"            # 用户访问入口
+      - "8088:80"          # 用户访问入口；宿主机 80 被 Steam++ 占用，映射到 8088
     depends_on:
       - gateway
 
@@ -174,3 +244,5 @@ volumes:
   redis-data:
   rabbitmq-data:
   nacos-data:
+  prometheus-data:
+  grafana-data:

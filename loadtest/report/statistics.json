@@ -1,0 +1,34 @@
+{
+  "秒杀下单" : {
+    "transaction" : "秒杀下单",
+    "sampleCount" : 200,
+    "errorCount" : 0,
+    "errorPct" : 0.0,
+    "meanResTime" : 13.949999999999987,
+    "medianResTime" : 11.0,
+    "minResTime" : 10.0,
+    "maxResTime" : 88.0,
+    "pct1ResTime" : 14.0,
+    "pct2ResTime" : 20.94999999999999,
+    "pct3ResTime" : 87.0,
+    "throughput" : 41.71881518564872,
+    "receivedKBytesPerSec" : 25.359254406549855,
+    "sentKBytesPerSec" : 30.673310713913228
+  },
+  "Total" : {
+    "transaction" : "Total",
+    "sampleCount" : 200,
+    "errorCount" : 0,
+    "errorPct" : 0.0,
+    "meanResTime" : 13.949999999999987,
+    "medianResTime" : 11.0,
+    "minResTime" : 10.0,
+    "maxResTime" : 88.0,
+    "pct1ResTime" : 14.0,
+    "pct2ResTime" : 20.94999999999999,
+    "pct3ResTime" : 87.0,
+    "throughput" : 41.71881518564872,
+    "receivedKBytesPerSec" : 25.359254406549855,
+    "sentKBytesPerSec" : 30.673310713913228
+  }
+}

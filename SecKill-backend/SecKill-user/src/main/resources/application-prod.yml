@@ -18,5 +18,7 @@ jwt:
   private-key: ${JWT_PRIVATE_KEY}
   public-key: ${JWT_PUBLIC_KEY}
   expiration: ${JWT_EXPIRATION}
+  # refresh token 有效期（毫秒），双 token 机制：access 短时效靠它续期
+  refresh-expiration: ${JWT_REFRESH_EXPIRATION}
 gateway:
   internal-secret: ${GATEWAY_INTERNAL_SECRET}

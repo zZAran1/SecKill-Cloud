@@ -4,21 +4,15 @@ import com.example.model.dto.LoginDTO;
 import com.example.model.dto.RegisterDTO;
 import com.example.model.vo.TokenVO;
 import com.example.model.vo.UserInfoVO;
-import com.example.security.LoginUser;
 import com.example.service.UserService;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.web.servlet.MockMvc;
-
-import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
@@ -40,11 +34,6 @@ class UserControllerTest {
     @MockBean
     UserService userService;
 
-    @AfterEach
-    void tearDown() {
-        SecurityContextHolder.clearContext();   // 防止登录态泄漏到下一个测试
-    }
-
     private RegisterDTO buildRegisterDTO() {
         RegisterDTO dto = new RegisterDTO();
         dto.setEmail("a@b.com");
@@ -54,16 +43,6 @@ class UserControllerTest {
         dto.setAge(20);
         dto.setSex("M");
         return dto;
-    }
-
-    /** 模拟已登录：手动往安全上下文放一个 LoginUser */
-    private void mockLoginUser(Long userId) {
-        LoginUser loginUser = new LoginUser();
-        loginUser.setId(userId);
-        loginUser.setUsername("tester");
-        UsernamePasswordAuthenticationToken auth =
-                new UsernamePasswordAuthenticationToken(loginUser, null, List.of());
-        SecurityContextHolder.getContext().setAuthentication(auth);
     }
 
     @Test
@@ -107,14 +86,14 @@ class UserControllerTest {
 
     @Test
     void 获取用户信息_已登录_返回数据() throws Exception {
-        mockLoginUser(1L);
         UserInfoVO vo = new UserInfoVO();
         vo.setId(1L);
         vo.setUsername("tester");
         vo.setEmail("a@b.com");
         when(userService.getUserInfo(1L)).thenReturn(vo);
 
-        mockMvc.perform(get("/users/me"))
+        // 身份来自网关注入的 X-User-Id 请求头（UserContext 读请求头，不读 SecurityContext）
+        mockMvc.perform(get("/users/me").header("X-User-Id", "1"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.username").value("tester"))
                 .andExpect(jsonPath("$.data.email").value("a@b.com"));

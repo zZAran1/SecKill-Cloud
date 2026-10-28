@@ -27,6 +27,9 @@ mybatis-plus:
     log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
 gateway:
   internal-secret: ${GATEWAY_INTERNAL_SECRET}
+# 支付渠道回调签名密钥（与支付渠道约定，禁止硬编码，通过环境变量注入）
+payment:
+  secret: ${PAYMENT_SECRET}
 jwt:
   public-key: ${JWT_PUBLIC_KEY}
   expiration: ${JWT_EXPIRATION}

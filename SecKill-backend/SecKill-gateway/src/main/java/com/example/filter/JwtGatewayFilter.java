@@ -32,15 +32,18 @@ import java.util.concurrent.TimeUnit;
 @Component
 public class JwtGatewayFilter implements GlobalFilter, Ordered {
 
-    // 精确匹配：路径 + 允许的方法（登录、注册）
+    // 精确匹配：路径 + 允许的方法（登录、注册、刷新令牌、支付渠道回调）
     private static final Map<String, Set<HttpMethod>> EXACT_WHITE_LIST = Map.of(
             "/users", Set.of(HttpMethod.POST),
-            "/users/login", Set.of(HttpMethod.POST));
+            "/users/login", Set.of(HttpMethod.POST),
+            "/users/refresh", Set.of(HttpMethod.POST),
+            "/payments/notify", Set.of(HttpMethod.POST));
 
-    // 前缀匹配：仅 GET 放行（文档、健康检查、商品浏览、秒杀活动浏览）
+    // 前缀匹配：仅 GET 放行（文档、健康检查、监控指标、商品浏览、秒杀活动浏览）
     // 注意：这里放行的请求不会注入身份头，下游 GatewaySignatureFilter 的白名单必须同步放行，否则会被 401
     private static final List<String> GET_PREFIX_WHITE_LIST = List.of(
-            "/v3/api-docs", "/swagger-ui", "/actuator/health", "/products", "/seckill-activities");
+            "/v3/api-docs", "/swagger-ui", "/actuator/health", "/actuator/prometheus",
+            "/products", "/seckill-activities");
 
     private final PublicKey publicKey;
     private final StringRedisTemplate redisTemplate;

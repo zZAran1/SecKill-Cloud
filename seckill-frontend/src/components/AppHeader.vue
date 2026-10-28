@@ -33,6 +33,7 @@ async function onLogout() {
           <router-link :to="{ name: 'product-new' }" class="nav-link" active-class="on">发布商品</router-link>
           <router-link :to="{ name: 'admin-activities' }" class="nav-link" active-class="on">活动管理</router-link>
           <router-link :to="{ name: 'admin-orders' }" class="nav-link" active-class="on">订单管理</router-link>
+          <router-link :to="{ name: 'admin-refunds' }" class="nav-link" active-class="on">退款审核</router-link>
           <router-link :to="{ name: 'admin-users' }" class="nav-link" active-class="on">用户管理</router-link>
         </template>
       </nav>

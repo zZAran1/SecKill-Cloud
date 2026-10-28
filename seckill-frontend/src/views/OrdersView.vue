@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { orderApi } from '@/api/order'
+import { refundApi } from '@/api/refund'
 import PagerBar from '@/components/PagerBar.vue'
 import type { Order } from '@/types'
 import { formatPrice, formatTime, orderStatusText } from '@/utils/format'
@@ -14,20 +15,25 @@ const errorMsg = ref('')
 const payingNo = ref('')
 const cancellingNo = ref('')
 
-const activeTab = ref<'all' | 0 | 1 | 2>('all')
+const activeTab = ref<'all' | 0 | 1 | 2 | 3 | 4 | 5>('all')
 const page = ref(1)
 const size = 10
 const total = ref(0)
+const completingNo = ref('')
+const refundingNo = ref('')
 
 const TABS = [
   { key: 'all', label: '全部订单' },
   { key: 0, label: '待支付' },
   { key: 1, label: '已支付' },
   { key: 2, label: '已取消' },
+  { key: 3, label: '已完成' },
+  { key: 4, label: '退款中' },
+  { key: 5, label: '已退款' },
 ] as const
 
 function statusClass(status: number): string {
-  return status === 1 ? 'on' : status === 2 ? 'muted' : 'off'
+  return status === 1 || status === 3 ? 'on' : status === 2 || status === 5 ? 'muted' : 'off'
 }
 
 async function load() {
@@ -48,7 +54,7 @@ async function load() {
   }
 }
 
-function switchTab(key: 'all' | 0 | 1 | 2) {
+function switchTab(key: 'all' | 0 | 1 | 2 | 3 | 4 | 5) {
   if (activeTab.value === key) return
   activeTab.value = key
   page.value = 1
@@ -64,8 +70,8 @@ async function pay(order: Order) {
   if (payingNo.value) return
   payingNo.value = order.orderNo
   try {
-    await orderApi.pay(order.orderNo)
-    toast.show('支付成功', 'success')
+    const res = await orderApi.pay(order.orderNo)
+    toast.show(res.msg || '支付成功', res.data?.status === 1 ? 'success' : 'error')
     await load()
   } catch (e) {
     toast.show(e instanceof Error ? e.message : '支付失败，请稍后再试', 'error')
@@ -86,6 +92,57 @@ async function cancel(order: Order) {
     toast.show(e instanceof Error ? e.message : '取消失败，请稍后再试', 'error')
   } finally {
     cancellingNo.value = ''
+  }
+}
+
+async function complete(order: Order) {
+  if (completingNo.value) return
+  completingNo.value = order.orderNo
+  try {
+    await orderApi.complete(order.orderNo)
+    toast.show('订单已完成', 'success')
+    await load()
+  } catch (e) {
+    toast.show(e instanceof Error ? e.message : '操作失败，请稍后再试', 'error')
+  } finally {
+    completingNo.value = ''
+  }
+}
+
+/** 已支付/已完成订单可申请退款，订单进入退款中等待审核 */
+async function applyRefund(order: Order) {
+  if (refundingNo.value) return
+  const reason = window.prompt(`申请退款订单 ${order.orderNo}\n请填写退款原因：`)
+  if (reason === null) return
+  if (!reason.trim()) {
+    toast.show('退款原因不能为空', 'error')
+    return
+  }
+  refundingNo.value = order.orderNo
+  try {
+    await refundApi.apply({ orderNo: order.orderNo, reason: reason.trim() })
+    toast.show('退款申请已提交，请等待审核', 'success')
+    await load()
+  } catch (e) {
+    toast.show(e instanceof Error ? e.message : '申请失败，请稍后再试', 'error')
+  } finally {
+    refundingNo.value = ''
+  }
+}
+
+/** 撤回待审核的退款申请，订单恢复已支付 */
+async function revokeRefund(order: Order) {
+  if (refundingNo.value) return
+  if (!window.confirm(`确定撤回订单 ${order.orderNo} 的退款申请吗？`)) return
+  refundingNo.value = order.orderNo
+  try {
+    await refundApi.cancelByOrder(order.orderNo)
+    toast.show('退款申请已撤回', 'success')
+    await load()
+  } catch (e) {
+    toast.show(e instanceof Error ? e.message : '撤回失败，请稍后再试', 'error')
+  } finally {
+    refundingNo.value = ''
   }
 }
 
@@ -181,6 +238,36 @@ onMounted(load)
                 </span>
               </div>
               <div class="order-btns">
+                <button
+                  v-if="o.status === 4"
+                  class="btn btn-line btn-sm"
+                  type="button"
+                  :disabled="!!refundingNo"
+                  @click="revokeRefund(o)"
+                >
+                  <span v-if="refundingNo === o.orderNo" class="spinner"></span>
+                  {{ refundingNo === o.orderNo ? '处理中' : '撤回退款' }}
+                </button>
+                <button
+                  v-if="o.status === 1 || o.status === 3"
+                  class="btn btn-danger-line btn-sm"
+                  type="button"
+                  :disabled="!!refundingNo"
+                  @click="applyRefund(o)"
+                >
+                  <span v-if="refundingNo === o.orderNo" class="spinner"></span>
+                  {{ refundingNo === o.orderNo ? '提交中' : '申请退款' }}
+                </button>
+                <button
+                  v-if="o.status === 1"
+                  class="btn btn-line btn-sm"
+                  type="button"
+                  :disabled="!!completingNo"
+                  @click="complete(o)"
+                >
+                  <span v-if="completingNo === o.orderNo" class="spinner"></span>
+                  {{ completingNo === o.orderNo ? '处理中' : '确认完成' }}
+                </button>
                 <button
                   v-if="o.status === 0"
                   class="btn btn-danger-line btn-sm"

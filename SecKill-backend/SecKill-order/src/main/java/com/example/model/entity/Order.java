@@ -20,6 +20,8 @@ public class Order {
     private Integer quantity;
     private BigDecimal totalAmount;
     private Integer status;
+    /**支付成功时间*/
+    private LocalDateTime payTime;
     private LocalDateTime expireTime;
     private LocalDateTime createTime;
     private LocalDateTime updateTime;

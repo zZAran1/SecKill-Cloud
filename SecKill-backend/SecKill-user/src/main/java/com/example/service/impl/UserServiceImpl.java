@@ -18,8 +18,9 @@ import com.example.model.vo.UserInfoVO;
 import com.example.result.ErrorCode;
 import com.example.result.PageResult;
 import com.example.security.LoginFailLimiter;
+import com.example.security.RefreshTokenManager;
+import com.example.security.UserContext;
 import com.example.service.UserService;
-import com.example.util.JwtUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DuplicateKeyException;
@@ -37,20 +38,21 @@ public class UserServiceImpl extends ServiceImpl<UserMapper,Users> implements Us
     private static final String USER_BLACKLIST_KEY = "user:blacklist:";
 
     private final PasswordEncoder passwordEncoder;
-    private final JwtUtil jwtUtil;
 
     private final LoginFailLimiter limiter;
 
     private final StringRedisTemplate redisTemplate;
 
+    private final RefreshTokenManager refreshTokenManager;
+
     public UserServiceImpl(PasswordEncoder passwordEncoder,
-                           JwtUtil jwtUtil,
                            LoginFailLimiter limiter,
-                           StringRedisTemplate redisTemplate) {
+                           StringRedisTemplate redisTemplate,
+                           RefreshTokenManager refreshTokenManager) {
         this.passwordEncoder = passwordEncoder;
-        this.jwtUtil = jwtUtil;
         this.limiter = limiter;
         this.redisTemplate = redisTemplate;
+        this.refreshTokenManager = refreshTokenManager;
     }
 
     @Override
@@ -80,10 +82,15 @@ public class UserServiceImpl extends ServiceImpl<UserMapper,Users> implements Us
         if(dbUser.getStatus()!= UserConstants.STATUS_ENABLED){
             throw new UserException(ErrorCode.ACCOUNT_DISABLED);
         }
-        TokenVO tokenVO=new TokenVO();
-        tokenVO.setToken(jwtUtil.generateToken(dbUser.getId(),dbUser.getUsername(),String.valueOf(dbUser.getRole()),String.valueOf(dbUser.getStatus())));
+        // 双 token：短时效 access + 长时效 refresh（存 Redis 可随时吊销）
+        TokenVO tokenVO = refreshTokenManager.issue(dbUser);
         limiter.onSuccess(dto.getPhone());
         return tokenVO;
+    }
+
+    @Override
+    public TokenVO refresh(String refreshToken) {
+        return refreshTokenManager.refresh(refreshToken);
     }
 
     @Override
@@ -97,7 +104,8 @@ public class UserServiceImpl extends ServiceImpl<UserMapper,Users> implements Us
 
     @Override
     public void logout(){
-
+        // 吊销 refresh token，防止登出后旧 refresh 还能续期
+        refreshTokenManager.revoke(UserContext.getUserId());
     }
 
     @Override

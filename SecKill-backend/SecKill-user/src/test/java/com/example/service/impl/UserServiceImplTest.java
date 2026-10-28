@@ -8,7 +8,7 @@ import com.example.model.entity.Users;
 import com.example.model.vo.TokenVO;
 import com.example.result.ErrorCode;
 import com.example.security.LoginFailLimiter;
-import com.example.util.JwtUtil;
+import com.example.security.RefreshTokenManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -30,7 +30,7 @@ class UserServiceImplTest {
     @Mock
     PasswordEncoder passwordEncoder;
     @Mock
-    JwtUtil jwtUtil;
+    RefreshTokenManager refreshTokenManager;
     @Mock
     LoginFailLimiter loginFailLimiter;
     @Mock
@@ -42,7 +42,7 @@ class UserServiceImplTest {
 
     @BeforeEach
     void setUp() {
-        userService = new UserServiceImpl(passwordEncoder, jwtUtil, loginFailLimiter, redisTemplate);
+        userService = new UserServiceImpl(passwordEncoder, loginFailLimiter, redisTemplate, refreshTokenManager);
         ReflectionTestUtils.setField(userService, "baseMapper", userMapper);
     }
 
@@ -111,11 +111,15 @@ class UserServiceImplTest {
         db.setRole(2);
         when(userMapper.selectOne(any())).thenReturn(db);
         when(passwordEncoder.matches("Abc12345", "ENCODED")).thenReturn(true);
-        when(jwtUtil.generateToken(any(), any(), any(), any())).thenReturn("TOKEN");
+        TokenVO issued = new TokenVO();
+        issued.setToken("TOKEN");
+        issued.setRefreshToken("REFRESH");
+        when(refreshTokenManager.issue(any(Users.class))).thenReturn(issued);
 
         TokenVO vo = userService.login(dto);
 
         assertEquals("TOKEN", vo.getToken());
+        assertEquals("REFRESH", vo.getRefreshToken());
         verify(loginFailLimiter).onSuccess("13800000000");
     }
 }

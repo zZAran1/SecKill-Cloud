@@ -13,7 +13,13 @@ import com.example.result.PageResult;
 public interface UserService extends IService<Users> {
     void register(RegisterDTO dto);
     TokenVO login(LoginDTO dto);
+
+    /**用 refresh token 换新 token 对（旧 refresh 一次性使用，重放拒绝）*/
+    TokenVO refresh(String refreshToken);
+
     UserInfoVO getUserInfo(Long userId);
+
+    /**退出登录：拉黑当前 access token（网关处理）并吊销 refresh token*/
     void logout();
 
     /**修改个人资料（只更新传入的字段）*/

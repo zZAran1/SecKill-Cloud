@@ -41,7 +41,12 @@ export interface RegisterPayload {
 }
 
 export interface TokenData {
+  /** 访问令牌（短时效，接口调用用） */
   token: string
+  /** 刷新令牌（长时效，仅用于换新 token，一次性使用） */
+  refreshToken: string
+  /** access token 剩余有效秒数 */
+  expiresIn: number
 }
 
 /** 对应后端 UserInfoVO，role: 0 超管 / 1 管理员 / 2 普通用户；status: 1 正常 / 0 封禁 */
@@ -159,7 +164,7 @@ export interface SeckillResult {
 
 /* ---------- 订单 ---------- */
 
-/** 对应后端 OrderVO，status: 0 待支付 / 1 已支付 / 2 已取消 */
+/** 对应后端 OrderVO，status: 0 待支付 / 1 已支付 / 2 已取消 / 3 已完成 / 4 退款中 / 5 已退款 */
 export interface Order {
   orderNo: string
   userId: number
@@ -170,10 +175,54 @@ export interface Order {
   totalAmount: number
   status: number
   statusDesc: string
+  /** 支付成功时间 */
+  payTime: string | null
   /** 支付截止时间 */
   expireTime: string | null
   createTime: string
   updateTime: string
+}
+
+/** 对应后端 PaymentVO，status: 0 待支付 / 1 支付成功 / 2 支付失败 / 3 已关闭 / 4 已退款 */
+export interface Payment {
+  paymentNo: string
+  orderNo: string
+  userId: number
+  amount: number
+  /** 支付渠道 MOCK/ALIPAY/WXPAY */
+  channel: string
+  status: number
+  statusDesc: string
+  /** 第三方支付流水号 */
+  tradeNo: string | null
+  createTime: string
+  updateTime: string
+}
+
+/* ---------- 退款/售后 ---------- */
+
+/** 对应后端 RefundVO，status: 0 待审核 / 1 退款成功 / 2 已拒绝 / 3 已取消 */
+export interface Refund {
+  refundNo: string
+  orderNo: string
+  paymentNo: string | null
+  userId: number
+  amount: number
+  reason: string
+  status: number
+  statusDesc: string
+  /** 审核管理员用户 ID */
+  auditBy: number | null
+  auditRemark: string | null
+  /** 渠道退款流水号 */
+  channelRefundNo: string | null
+  createTime: string
+  updateTime: string
+}
+
+export interface CreateRefundPayload {
+  orderNo: string
+  reason: string
 }
 
 export interface CreateOrderPayload {

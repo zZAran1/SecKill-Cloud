@@ -23,7 +23,7 @@ const size = 10
 const total = ref(0)
 
 function statusClass(status: number): string {
-  return status === 1 ? 'on' : status === 2 ? 'muted' : 'off'
+  return status === 1 || status === 3 ? 'on' : status === 2 || status === 5 ? 'muted' : 'off'
 }
 
 async function load() {
@@ -118,6 +118,9 @@ onMounted(load)
             <option :value="0">待支付</option>
             <option :value="1">已支付</option>
             <option :value="2">已取消</option>
+            <option :value="3">已完成</option>
+            <option :value="4">退款中</option>
+            <option :value="5">已退款</option>
           </select>
           <button class="btn btn-primary" type="button" @click="search">搜索</button>
           <button class="btn btn-line" type="button" @click="reset">重置</button>

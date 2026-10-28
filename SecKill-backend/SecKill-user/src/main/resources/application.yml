@@ -19,7 +19,15 @@ mybatis-plus:
   configuration:
     map-underscore-to-camel-case: true
 management:
+  tracing:
+    sampling:
+      probability: 1.0   # 链路追踪全采样，保证日志都有 traceId（生产流量大时可调低）
   endpoints:
     web:
       exposure:
-        include: health
+        include: health,info,prometheus,metrics
+
+# 可观测性：日志输出 [应用名,traceId,spanId]，跨服务串联同一次请求
+logging:
+  pattern:
+    correlation: "[${spring.application.name},%X{traceId:-},%X{spanId:-}] "

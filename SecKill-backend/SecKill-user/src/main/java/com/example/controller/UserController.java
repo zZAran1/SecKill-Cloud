@@ -4,6 +4,7 @@ import com.example.annotation.RequiresRole;
 import com.example.model.dto.ChangePasswordDTO;
 import com.example.model.dto.LoginDTO;
 import com.example.model.dto.RegisterDTO;
+import com.example.model.dto.RefreshTokenDTO;
 import com.example.model.dto.UpdateProfileDTO;
 import com.example.model.dto.UpdateUserStatusDTO;
 import com.example.model.vo.TokenVO;
@@ -33,6 +34,15 @@ public class UserController {
     @PostMapping("/login")
     public Result<TokenVO> login(@RequestBody @Valid LoginDTO dto) {
         return Result.success("登录成功",userService.login(dto));
+    }
+
+    /**
+     * 刷新令牌：旧 refreshToken 一次性换取新 token 对（网关白名单，无需登录）。
+     * access token 过期后前端拿 refresh token 调这里续期，无需重新登录。
+     */
+    @PostMapping("/refresh")
+    public Result<TokenVO> refresh(@RequestBody @Valid RefreshTokenDTO dto) {
+        return Result.success("刷新成功", userService.refresh(dto.getRefreshToken()));
     }
 
     @GetMapping("/me")

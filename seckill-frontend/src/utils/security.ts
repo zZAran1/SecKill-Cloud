@@ -6,8 +6,10 @@
  */
 
 const TOKEN_KEY = 'seckill.token'
+const REFRESH_KEY = 'seckill.refresh'
 
 let memoryToken: string | null = null
+let memoryRefresh: string | null = null
 
 export function getToken(): string | null {
   if (memoryToken) return memoryToken
@@ -20,9 +22,23 @@ export function setToken(token: string) {
   sessionStorage.setItem(TOKEN_KEY, token)
 }
 
+export function getRefreshToken(): string | null {
+  if (memoryRefresh) return memoryRefresh
+  memoryRefresh = sessionStorage.getItem(REFRESH_KEY)
+  return memoryRefresh
+}
+
+export function setRefreshToken(refreshToken: string) {
+  memoryRefresh = refreshToken
+  sessionStorage.setItem(REFRESH_KEY, refreshToken)
+}
+
+/** 清空登录态（access + refresh 一起清） */
 export function clearToken() {
   memoryToken = null
+  memoryRefresh = null
   sessionStorage.removeItem(TOKEN_KEY)
+  sessionStorage.removeItem(REFRESH_KEY)
 }
 
 /** 解析 JWT 载荷中的过期时间（秒），解析失败返回 null */

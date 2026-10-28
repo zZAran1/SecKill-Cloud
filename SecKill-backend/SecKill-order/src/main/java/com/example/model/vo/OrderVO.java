@@ -15,8 +15,10 @@ public class OrderVO {
     private Long activityId;
     private Integer quantity;
     private BigDecimal totalAmount;
-    /**0 待支付 1 已支付 2 已取消*/
+    /**0 待支付 1 已支付 2 已取消 3 已完成 4 退款中 5 已退款*/
     private Integer status;
+    /**支付成功时间*/
+    private LocalDateTime payTime;
     /**支付截止时间*/
     private LocalDateTime expireTime;
     private LocalDateTime createTime;

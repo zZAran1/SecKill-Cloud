@@ -32,7 +32,7 @@ export function maskEmail(email: string | null | undefined): string {
   return `${kept}${'*'.repeat(Math.max(name.length - kept.length, 2))}${email.slice(at)}`
 }
 
-/** 订单状态文案：0 待支付 / 1 已支付 / 2 已取消 */
+/** 订单状态文案：0 待支付 / 1 已支付 / 2 已取消 / 3 已完成 / 4 退款中 / 5 已退款 */
 export function orderStatusText(status: number | null | undefined): string {
   switch (status) {
     case 0:
@@ -41,6 +41,12 @@ export function orderStatusText(status: number | null | undefined): string {
       return '已支付'
     case 2:
       return '已取消'
+    case 3:
+      return '已完成'
+    case 4:
+      return '退款中'
+    case 5:
+      return '已退款'
     default:
       return '未知状态'
   }

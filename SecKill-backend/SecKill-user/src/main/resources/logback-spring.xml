@@ -1,8 +1,9 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <configuration>
     <property name="LOG_DIR" value="logs"/>
+    <!-- 自定义 pattern 不会被 logging.pattern.correlation 影响，traceId/spanId 手动加入，用于跨服务串联请求 -->
     <property name="PATTERN"
-              value="%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"/>
+              value="%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level [%X{traceId:-},%X{spanId:-}] %logger{36} - %msg%n"/>
 
     <appender name ="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
         <encoder><pattern>${PATTERN}</pattern></encoder>

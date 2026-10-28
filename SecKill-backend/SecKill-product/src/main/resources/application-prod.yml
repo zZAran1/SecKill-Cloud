@@ -14,7 +14,8 @@ management:
   endpoints:
     web:
       exposure:
-        include: health
+        # 生产同样要给 Prometheus 抓指标（仅容器网络可达，不对外）
+        include: health,info,prometheus,metrics
 
 springdoc:
   swagger-ui:

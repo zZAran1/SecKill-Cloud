@@ -66,6 +66,15 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-actuator</artifactId>
         </dependency>
+        <!-- 可观测性：Micrometer 链路追踪（日志输出 traceId/spanId）+ Prometheus 指标暴露 -->
+        <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-tracing-bridge-brave</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-registry-prometheus</artifactId>
+        </dependency>
         <dependency>
             <groupId>org.flywaydb</groupId>
             <artifactId>flyway-core</artifactId>
@@ -83,5 +92,13 @@
             <artifactId>junit</artifactId>
         </dependency>
     </dependencies>
-
+        <build>
+        <plugins>
+            <!-- Spring Boot 打包插件：打成可执行 fat jar（common 是纯库模块，不加） -->
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+        </plugins>
+    </build>
 </project>

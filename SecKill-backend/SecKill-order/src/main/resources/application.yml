@@ -15,6 +15,13 @@ spring:
       discovery:
         server-addr: ${NACOS_ADDR:127.0.0.1:8848}
         ip: ${NACOS_DISCOVERY_IP:127.0.0.1}
+    openfeign:
+      client:
+        config:
+          default:
+            # Feign 调用超时收紧：连接 2s / 读 3s，配合熔断器快速失败，避免慢调用拖垮线程池
+            connectTimeout: 2000
+            readTimeout: 3000
 
 mybatis-plus:
   configuration:
@@ -24,8 +31,34 @@ mybatis-plus:
 order:
   pay-timeout-minutes: ${ORDER_PAY_TIMEOUT_MINUTES:15}
 
+# 熔断降级：商品服务调用（ProductClientGuard）连续失败/超时后快速失败，
+# 半开状态自动探测恢复；降级语义是「快速失败并返回明确错误」，绝不假装成功
+resilience4j:
+  circuitbreaker:
+    configs:
+      default:
+        slidingWindowSize: 20          # 最近 20 次调用统计窗口
+        minimumNumberOfCalls: 10       # 至少 10 次调用才计算失败率
+        failureRateThreshold: 50       # 失败率超 50% 打开熔断
+        slowCallDurationThreshold: 2s  # 超过 2s 视为慢调用
+        slowCallRateThreshold: 50      # 慢调用率超 50% 也打开熔断
+        waitDurationInOpenState: 10s   # 熔断打开 10s 后转半开
+        permittedNumberOfCallsInHalfOpenState: 5
+        registerHealthIndicator: true  # 熔断器状态进 Actuator health
+    instances:
+      productClient:
+        baseConfig: default
+
 management:
+  tracing:
+    sampling:
+      probability: 1.0   # 链路追踪全采样，保证日志都有 traceId（生产流量大时可调低）
   endpoints:
     web:
       exposure:
-        include: health
+        include: health,info,prometheus,metrics
+
+# 可观测性：日志输出 [应用名,traceId,spanId]，跨服务串联同一次请求
+logging:
+  pattern:
+    correlation: "[${spring.application.name},%X{traceId:-},%X{spanId:-}] "

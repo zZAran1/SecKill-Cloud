@@ -1,6 +1,6 @@
 import { computed, reactive } from 'vue'
 import { userApi } from '@/api/user'
-import { clearToken, getToken, setToken } from '@/utils/security'
+import { clearToken, getToken, setRefreshToken, setToken } from '@/utils/security'
 import type { LoginPayload, RegisterPayload, UserInfo } from '@/types'
 
 const USER_KEY = 'seckill.user'
@@ -41,6 +41,8 @@ export function useAuth() {
     const res = await userApi.login(payload)
     state.token = res.data.token
     persist()
+    // 长时效 refresh token 用于 access 过期后静默续期
+    setRefreshToken(res.data.refreshToken)
     try {
       await fetchUser()
     } catch {

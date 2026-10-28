@@ -88,13 +88,20 @@ public class GatewaySignatureFilter implements Filter {
         }
     }
     private boolean isWhite(String path, String method) {
+        // Prometheus 抓指标走容器网络直连服务端口，无网关签名，需放行（指标不含业务敏感数据）
         if (path.startsWith("/actuator/health")
+                || path.startsWith("/actuator/prometheus")
                 || path.startsWith("/v3/api-docs")
                 || path.startsWith("/swagger-ui")) {
             return true;
         }
-        if ((path.equals("/users") || path.equals("/users/login"))
+        if ((path.equals("/users") || path.equals("/users/login") || path.equals("/users/refresh"))
                 && "POST".equalsIgnoreCase(method)) {
+            return true;
+        }
+        // 支付渠道回调：无登录态的公开接口，安全靠回调报文签名（payment.secret）保证，
+        // 与网关 JwtGatewayFilter.EXACT_WHITE_LIST 保持一致
+        if (path.equals("/payments/notify") && "POST".equalsIgnoreCase(method)) {
             return true;
         }
         // 公开浏览接口：网关放行后不注入身份头，这里必须同步放行，否则匿名浏览会被 401

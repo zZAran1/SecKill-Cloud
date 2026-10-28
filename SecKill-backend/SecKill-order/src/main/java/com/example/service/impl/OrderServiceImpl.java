@@ -4,7 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
-import com.example.client.ProductClient;
+import com.example.client.ProductClientGuard;
 import com.example.client.dto.ProductDTO;
 import com.example.config.OrderDelayConfig;
 import com.example.constant.SeckillRedisKeys;
@@ -12,6 +12,7 @@ import com.example.converter.OrderConverter;
 import com.example.exception.BaseBusinessException;
 import com.example.mapper.OrderMapper;
 import com.example.message.OrderCloseMessage;
+import com.example.model.OrderStateMachine;
 import com.example.model.OrderStatus;
 import com.example.model.dto.CreateOrderDTO;
 import com.example.model.entity.Order;
@@ -44,11 +45,11 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
     /**支付超时时间，与 OrderDelayConfig 延迟队列 TTL 共用 order.pay-timeout-minutes 配置*/
     private final long payTimeoutMinutes;
 
-    private final ProductClient productClient;
+    private final ProductClientGuard productClient;
     private final RabbitTemplate rabbitTemplate;
     private final StringRedisTemplate redisTemplate;
 
-    public OrderServiceImpl(ProductClient productClient,
+    public OrderServiceImpl(ProductClientGuard productClient,
                             RabbitTemplate rabbitTemplate,
                             StringRedisTemplate redisTemplate,
                             @Value("${order.pay-timeout-minutes:15}") long payTimeoutMinutes) {
@@ -133,27 +134,88 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public void payOrder(String orderNo) {
-        Long userId = UserContext.getUserId();
+    public boolean markPaid(String orderNo) {
+        // 状态机校验：待支付→已支付是唯一合法的支付落账路径
+        OrderStateMachine.verify(OrderStatus.UNPAID, OrderStatus.PAID);
+        // 条件更新：WHERE status=0，与取消/超时关单竞争时只有一个能流转成功
+        return this.update(new LambdaUpdateWrapper<Order>()
+                .eq(Order::getOrderNo, orderNo)
+                .eq(Order::getStatus, OrderStatus.UNPAID)
+                .set(Order::getStatus, OrderStatus.PAID)
+                .set(Order::getPayTime, LocalDateTime.now()));
+    }
 
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void completeOrder(String orderNo) {
         Order order = getByOrderNo(orderNo);
         if (order == null) {
             throw new BaseBusinessException(ErrorCode.ORDER_NOT_FOUND);
         }
-        if (!order.getUserId().equals(userId)) {
+        if (!isAdmin() && !order.getUserId().equals(UserContext.getUserId())) {
             throw new BaseBusinessException(ErrorCode.FORBIDDEN);
         }
-        // 幂等：支付平台可能重试回调，已支付直接返回成功
-        if (order.getStatus() == OrderStatus.PAID) {
-            return;
-        }
-        if (order.getStatus() != OrderStatus.UNPAID) {
-            throw new BaseBusinessException(ErrorCode.ORDER_CLOSED);
-        }
-        // 条件更新：WHERE status=0 保证并发下只有一个请求能流转状态
+        // 状态机校验：只有已支付订单能确认完成
+        OrderStateMachine.verify(order.getStatus(), OrderStatus.COMPLETED);
         boolean updated = this.update(new LambdaUpdateWrapper<Order>()
                 .eq(Order::getOrderNo, orderNo)
-                .eq(Order::getStatus, OrderStatus.UNPAID)
+                .eq(Order::getStatus, OrderStatus.PAID)
+                .set(Order::getStatus, OrderStatus.COMPLETED));
+        if (!updated) {
+            throw new BaseBusinessException(ErrorCode.ORDER_STATUS_ERROR, "订单状态已变更，请刷新后重试");
+        }
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void toRefunding(String orderNo) {
+        Order order = getByOrderNo(orderNo);
+        if (order == null) {
+            throw new BaseBusinessException(ErrorCode.ORDER_NOT_FOUND);
+        }
+        // 状态机校验：只有已支付/已完成订单能进入退款流程
+        OrderStateMachine.verify(order.getStatus(), OrderStatus.REFUNDING);
+        boolean updated = this.update(new LambdaUpdateWrapper<Order>()
+                .eq(Order::getOrderNo, orderNo)
+                .in(Order::getStatus, OrderStatus.PAID, OrderStatus.COMPLETED)
+                .set(Order::getStatus, OrderStatus.REFUNDING));
+        if (!updated) {
+            throw new BaseBusinessException(ErrorCode.ORDER_STATUS_ERROR, "订单状态已变更，请刷新后重试");
+        }
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void toRefunded(String orderNo) {
+        Order order = getByOrderNo(orderNo);
+        if (order == null) {
+            throw new BaseBusinessException(ErrorCode.ORDER_NOT_FOUND);
+        }
+        // 状态机校验：退款中→已退款
+        OrderStateMachine.verify(order.getStatus(), OrderStatus.REFUNDED);
+        boolean updated = this.update(new LambdaUpdateWrapper<Order>()
+                .eq(Order::getOrderNo, orderNo)
+                .eq(Order::getStatus, OrderStatus.REFUNDING)
+                .set(Order::getStatus, OrderStatus.REFUNDED));
+        if (!updated) {
+            throw new BaseBusinessException(ErrorCode.ORDER_STATUS_ERROR, "订单状态已变更，请刷新后重试");
+        }
+        // 退款成功商品回到商家库存，与取消订单共用回补逻辑
+        restoreStock(order);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void backToPaid(String orderNo) {
+        Order order = getByOrderNo(orderNo);
+        if (order == null) {
+            throw new BaseBusinessException(ErrorCode.ORDER_NOT_FOUND);
+        }
+        // 状态机校验：退款中→已支付（退款被驳回/用户撤回申请）
+        OrderStateMachine.verify(order.getStatus(), OrderStatus.PAID);
+        boolean updated = this.update(new LambdaUpdateWrapper<Order>()
+                .eq(Order::getOrderNo, orderNo)
+                .eq(Order::getStatus, OrderStatus.REFUNDING)
                 .set(Order::getStatus, OrderStatus.PAID));
         if (!updated) {
             throw new BaseBusinessException(ErrorCode.ORDER_STATUS_ERROR, "订单状态已变更，请刷新后重试");
@@ -174,9 +236,7 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
         if (order.getStatus() == OrderStatus.CANCELLED) {
             return;
         }
-        if (order.getStatus() != OrderStatus.UNPAID) {
-            throw new BaseBusinessException(ErrorCode.ORDER_STATUS_ERROR, "已支付的订单不能取消，请申请退款");
-        }
+        // 状态流转统一在 closeAndRestore 做状态机校验，已支付的订单会被拒绝
         closeAndRestore(order);
     }
 
@@ -222,6 +282,8 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
      * 并发下（用户支付 vs 超时关闭）只有一个能更新成功，避免库存被重复回补。
      */
     private void closeAndRestore(Order order) {
+        // 状态机校验：只有待支付订单允许变更为已取消
+        OrderStateMachine.verify(order.getStatus(), OrderStatus.CANCELLED);
         boolean updated = this.update(new LambdaUpdateWrapper<Order>()
                 .eq(Order::getOrderNo, order.getOrderNo())
                 .eq(Order::getStatus, OrderStatus.UNPAID)
